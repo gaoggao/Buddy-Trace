@@ -1,0 +1,32 @@
+{
+  "name": "buddy-trace",
+  "version": "0.1.0",
+  "description": "WorkBuddy 会话记忆的本地备份与追溯工具：跨账号、跨会话无缝接续项目，随时查回任何一次改动的来龙去脉。",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "lbase": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/store.test.js test/server.test.js test/ui.test.js",
+    "embed": "node scripts/embed-ui.js",
+    "build": "node scripts/build.js",
+    "build:win": "node scripts/build.js win",
+    "build:mac": "node scripts/build.js mac",
+    "build:linux": "node scripts/build.js linux"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {},
+  "keywords": [
+    "ai",
+    "agent",
+    "memory",
+    "knowledge-base",
+    "skills",
+    "llm",
+    "mcp"
+  ]
+}

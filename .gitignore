@@ -1,0 +1,42 @@
+# 依赖
+node_modules/
+
+# 数据目录（用户的记忆不该进版本库）
+lbase-data/
+data/
+*-data/
+
+# 打包产物
+dist/
+
+# 备份文件
+*.tar
+*.tar.gz
+*.zip
+lbase-backup-*
+
+# 命名前的备份目录（含旧示例数据，不进版本库）
+*.bak*
+
+# 日志
+*.log
+logs/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 临时文件
+*.tmp
+.tmp/
+tmp/
+
+# 注意：src/assets.js 是 scripts/embed-ui.js 生成的，
+# 但需要提交进仓库，这样别人 clone 后不用先跑构建就能直接运行。

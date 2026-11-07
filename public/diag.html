@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LBASE 兼容性诊断</title>
+<style>
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #151a23;
+    color: #f2f5f9;
+    padding: 20px;
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  h1 { font-size: 20px; margin-bottom: 8px; }
+  .sub { color: #93a1b5; font-size: 13px; margin-bottom: 20px; }
+  .item {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    background: #212936;
+    border-left: 3px solid #35404f;
+  }
+  .ok { border-left-color: #3ddcab; }
+  .bad { border-left-color: #f07070; }
+  .name { font-weight: 600; }
+  .val { color: #b6c2d2; font-family: monospace; font-size: 13px; margin-top: 2px; }
+  .summary { margin-top: 24px; padding: 14px; border-radius: 8px; background: #2563eb; }
+  pre { background: #0e1117; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>LBASE 兼容性诊断</h1>
+<p class="sub">这个页面会检查你的浏览器支持哪些特性。把结果截图或复制给我。</p>
+<div id="out"></div>
+
+<script>
+(function () {
+  var out = document.getElementById('out');
+  var results = [];
+  var fails = 0;
+
+  function test(name, fn) {
+    var ok = false, val = '';
+    try {
+      val = fn();
+      ok = true;
+    } catch (e) {
+      val = '❌ ' + e.message;
+      ok = false;
+      fails++;
+    }
+    results.push({ name: name, ok: ok, val: String(val) });
+  }
+
+  // 浏览器信息
+  var ua = navigator.userAgent;
+  test('浏览器 UA', function () { return ua; });
+  test('window.fetch', function () { return typeof fetch; });
+  test('Promise', function () { return typeof Promise; });
+  test('async / await', function () { return eval('(async function(){return "支持"})()') ? '支持' : '不支持'; });
+  test('可选链 ?.', function () { return eval('({a:{b:1}}).a?.b'); });
+  test('空值合并 ??', function () { return eval('null ?? "支持"'); });
+  test('模板字符串', function () { return eval('`a${1}b`'); });
+  test('箭头函数', function () { return eval('(x=>x+1)(1)'); });
+  test('展开运算符', function () { return eval('[...[1,2],3].join(",")'); });
+  test('Array.flat', function () { return [1,[2]].flat().join(','); });
+  test('replaceChildren', function () {
+    var d = document.createElement('div');
+    if (typeof d.replaceChildren !== 'function') throw new Error('不支持');
+    return '支持';
+  });
+  test('AbortController', function () { return typeof AbortController; });
+  test('localStorage', function () {
+    localStorage.setItem('__t', '1');
+    var v = localStorage.getItem('__t');
+    localStorage.removeItem('__t');
+    return v;
+  });
+  test('CSS 变量', function () {
+    return window.CSS && CSS.supports && CSS.supports('color', 'var(--x)') ? '支持' : '不支持';
+  });
+  test('CSS grid', function () {
+    return window.CSS && CSS.supports && CSS.supports('display', 'grid') ? '支持' : '不支持';
+  });
+  test('CSS dvh 单位', function () {
+    if (!window.CSS || !CSS.supports) return '无法检测';
+    return CSS.supports('height', '100dvh') ? '支持' : '❌ 不支持';
+  });
+  test('backdrop-filter', function () {
+    if (!window.CSS || !CSS.supports) return '无法检测';
+    return CSS.supports('backdrop-filter', 'blur(4px)') ? '支持' : '不支持';
+  });
+  test('CSS clamp()', function () {
+    if (!window.CSS || !CSS.supports) return '无法检测';
+    return CSS.supports('width', 'clamp(1px,2vw,3px)') ? '支持' : '不支持';
+  });
+  test('navigator.clipboard', function () { return navigator.clipboard ? '支持' : '❌ 不支持'; });
+  test('script type=module', function () {
+    var s = document.createElement('script');
+    s.type = 'module';
+    return s.type === 'module' ? '支持' : '❌ 不支持';
+  });
+
+  // 实际 fetch 测试
+  function render() {
+    var html = '';
+    results.forEach(function (r) {
+      var cls = r.ok ? 'ok' : 'bad';
+      var badge = r.ok ? '✅' : '❌';
+      html += '<div class="item ' + cls + '">' +
+        '<div class="name">' + badge + ' ' + r.name + '</div>' +
+        '<div class="val">' + r.val + '</div>' +
+        '</div>';
+    });
+    out.innerHTML = html;
+
+    var sum = document.createElement('div');
+    sum.className = 'summary';
+    if (fails === 0) {
+      sum.innerHTML = '<b>全部通过</b>。如果 LBASE 还是黑屏，请把这段 UA 发给我：<br><code>' + ua + '</code>';
+    } else {
+      sum.innerHTML = '<b>' + fails + ' 项不支持</b>。这些是导致黑屏的原因，我会改进代码。';
+    }
+    out.appendChild(sum);
+
+    // 最后测真实 fetch
+    var fdiv = document.createElement('div');
+    fdiv.className = 'item';
+    fdiv.innerHTML = '<div class="name">⏳ 测试读取 LBASE 页面…</div>';
+    out.appendChild(fdiv);
+    fetch('/api/health')
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        fdiv.className = 'item ok';
+        fdiv.innerHTML = '<div class="name">✅ 能连上 LBASE 后端</div><div class="val">' +
+          JSON.stringify(j).slice(0, 120) + '</div>';
+      })
+      .catch(function (e) {
+        fdiv.className = 'item bad';
+        fdiv.innerHTML = '<div class="name">❌ 连不上 LBASE 后端</div><div class="val">' + e.message + '</div>';
+      });
+
+    // 测 JS 模块能否加载
+    var mdiv = document.createElement('div');
+    mdiv.className = 'item';
+    mdiv.innerHTML = '<div class="name">⏳ 测试加载界面脚本…</div>';
+    out.appendChild(mdiv);
+    fetch('/ui/app.js')
+      .then(function (r) { return r.text(); })
+      .then(function (t) {
+        mdiv.className = 'item ok';
+        mdiv.innerHTML = '<div class="name">✅ 界面脚本文件能下载</div><div class="val">' +
+          Math.round(t.length / 1024) + ' KB</div>';
+      })
+      .catch(function (e) {
+        mdiv.className = 'item bad';
+        mdiv.innerHTML = '<div class="name">❌ 界面脚本下载失败</div><div class="val">' + e.message + '</div>';
+      });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

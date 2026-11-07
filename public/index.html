@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>溯源 · Buddy Trace</title>
+<meta name="description" content="WorkBuddy 记忆的延伸 —— 项目丝滑交接，历史随时溯源。">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/img/logo-mark-128.png">
+<link rel="stylesheet" href="/ui/app.css?v=__VER__">
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- 顶栏：品牌 + 统计 -->
+  <header class="topbar">
+    <a class="brand" href="#/" title="溯源 · Buddy Trace">
+      <img class="brand-mark" src="/img/logo-mark-64.png" alt="" width="26" height="26">
+      <span class="brand-word">溯源</span>
+      <span class="brand-dot">·</span>
+      <span class="brand-en">Buddy Trace</span>
+    </a>
+    <div class="topbar-right" id="topbarRight"></div>
+  </header>
+
+  <div class="body-row">
+
+    <!-- 左侧菜单（分组） -->
+    <aside class="sider" id="sider"></aside>
+
+    <!-- 右侧主区 -->
+    <div class="content">
+      <div class="tabbar" id="tabbar"></div>
+      <main id="app" class="page-frame">
+        <div class="boot-hint">
+          <p>正在加载…</p>
+          <p class="boot-hint-sub">如果一直停在这里，请按 Ctrl+F5 强制刷新</p>
+        </div>
+      </main>
+    </div>
+
+  </div>
+</div>
+
+<noscript>
+  <div style="padding:48px 24px;text-align:center;color:#4a5856;font-family:system-ui,sans-serif">
+    <p style="font-size:15px">本页需要 JavaScript 才能运行</p>
+    <p style="font-size:13px;margin-top:12px">请在你的浏览器里启用 JavaScript，然后刷新页面。</p>
+  </div>
+</noscript>
+
+<!-- 对话框 -->
+<div class="modal-mask" id="modalMask" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script type="module" src="/ui/app.js?v=__VER__"></script>
+</body>
+</html>
