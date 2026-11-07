@@ -48,7 +48,7 @@ node src/index.js
 
 ## 许可
 
-个人永久免费使用，商业部署联系作者。详见 [LICENSE](LICENSE)。
+详见 [LICENSE](LICENSE)。
 
 ## 免责声明
 

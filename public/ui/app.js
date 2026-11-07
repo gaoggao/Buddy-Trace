@@ -778,7 +778,7 @@ function renderSider() {
   }, '© 2026 Buddy Trace'));
   footer.append(el('div', {
     style: 'margin-top:6px;font-size:10px;opacity:0.6',
-  }, '仅供个人学习使用 · 免责见设置页'));
+  }, '个人永久免费使用 · 免责见设置页'));
   sider.append(footer);
 }
 
@@ -2562,8 +2562,6 @@ async function renderSettings(main) {
       '1. 本软件是 WorkBuddy 记忆的辅助备份工具，仅供参考，不保证数据的完整性、准确性或时效性。因使用本软件造成的任何直接或间接损失，作者不承担任何责任。'),
     el('p', { style: 'font-size:12.5px;color:var(--text-mute);line-height:1.8;margin-bottom:6px' },
       '2. 本软件只读取 WorkBuddy 的数据，不修改其任何文件。你的数据始终在你自己的电脑上，请自行做好重要数据的备份。'),
-    el('p', { style: 'font-size:12.5px;color:var(--text-mute);line-height:1.8' },
-      '3. 本软件仅供个人学习、研究使用。商业部署请联系作者获得授权。'),
   );
   main.append(disc);
 }
