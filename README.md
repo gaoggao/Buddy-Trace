@@ -46,6 +46,40 @@ node src/index.js
 
 数据目录默认在程序旁边的 `data/`，可用 `--data` 指定。
 
+## 项目结构
+
+```
+src/                    后端服务（Node.js，无第三方依赖）
+  index.js              启动入口
+  server.js             HTTP 服务层（全部 API 接口）
+  store.js              存储层（本地库）
+  backup.js             备份
+  wb-sync.js            WorkBuddy 数据同步
+  wb-syncer.js          定时同步器
+  wb-guide.js           给 agent 的接入说明生成
+  wb-extract.js         WorkBuddy 数据提取
+  wb-privacy.js         隐私脱敏
+  wb-export.js          导出
+  remote.js             远程内容下发（Gitee/GitHub 双源）
+  help-data.js          帮助文档数据
+
+public/                 前端界面
+  index.html            页面骨架
+  ui/app.js             前端逻辑
+  ui/app.css            样式
+  img/                  图片资源
+
+scripts/                构建和部署脚本
+  build.js              打包单文件 exe
+  embed-ui.js           内嵌前端资源
+  wb-install.js         安装、计划任务、快捷方式
+  wb-watchdog.js        守护进程
+
+test/                   测试
+docs/                   文档
+installer.iss           Windows 安装包脚本（Inno Setup）
+```
+
 ## 许可
 
 详见 [LICENSE](LICENSE)。
