@@ -50,6 +50,7 @@ node src/index.js
 
 ```
 src/                    后端服务（Node.js，无第三方依赖）
+  shell.js              启动器（exe 入口，优先加载外部 code，缺失则用内置兜底）
   index.js              启动入口
   server.js             HTTP 服务层（全部 API 接口）
   store.js              存储层（本地库）
@@ -61,6 +62,10 @@ src/                    后端服务（Node.js，无第三方依赖）
   wb-privacy.js         隐私脱敏
   wb-export.js          导出
   remote.js             远程内容下发（Gitee/GitHub 双源）
+  updater.js            增量更新（下载/校验/备份/覆盖/回滚）
+  runtime.js            运行状态（runtime.json + 单实例检查）
+  ports.js              端口列表（统一来源）
+  version.js            版本号（统一来源）
   help-data.js          帮助文档数据
 
 public/                 前端界面
@@ -70,7 +75,7 @@ public/                 前端界面
   img/                  图片资源
 
 scripts/                构建和部署脚本
-  build.js              打包单文件 exe
+  build-exe.js          打包 exe 壳 + 增量代码包
   embed-ui.js           内嵌前端资源
   wb-install.js         安装、计划任务、快捷方式
   wb-watchdog.js        守护进程
@@ -78,7 +83,12 @@ scripts/                构建和部署脚本
 test/                   测试
 docs/                   文档
 installer.iss           Windows 安装包脚本（Inno Setup）
+CHANGELOG.md            更新日志
 ```
+
+## 更新日志
+
+版本更新记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 许可
 
