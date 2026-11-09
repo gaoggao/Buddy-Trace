@@ -2838,25 +2838,52 @@ window.addEventListener('hashchange', navigate);
       setTimeout(function () { showOnboarding(); }, 450);
     }
   } catch (e) {}
+
+  // 版本更新检查（2.0 增量更新：启动时查一次，有新版本弹窗，用户点确认才更新）
+  try {
+    const up = await API.get('/api/update-check');
+    if (up && up.hasUpdate) {
+      setTimeout(function () { showVersionUpdatePrompt(up); }, 800);
+    }
+  } catch (e) {}
 })();
 
-/** 云端有新内容 → 弹窗，用户选「立即更新」或「暂不更新」 */
-function showRemoteUpdatePrompt() {
+/** 更新后等待服务重启完成（轮询 /api/health，最多 30 秒） */
+async function waitServiceUp() {
+  for (let i = 0; i < 30; i++) {
+    await new Promise(function (r) { setTimeout(r, 1000); });
+    try {
+      const h = await API.get('/api/health').catch(function () { return null; });
+      if (h && h.ok) return true;
+    } catch (e) {}
+  }
+  return false;
+}
+
+/** 有新版本 → 弹窗，用户选「立即更新」或「暂不更新」 */
+function showVersionUpdatePrompt(up) {
+  const notes = up.notes ? el('div', { style: 'font-size:12.5px;color:var(--text-mute);line-height:1.6;margin-bottom:16px;white-space:pre-wrap' }, up.notes) : null;
   const content = el('div', {},
-    el('div', { style: 'font-size:15px;font-weight:600;margin-bottom:10px' }, '发现新内容'),
-    el('div', { style: 'font-size:13px;color:var(--text-mute);margin-bottom:18px' },
-      '云端发布了新内容，是否立即更新？'),
+    el('div', { style: 'font-size:15px;font-weight:600;margin-bottom:8px' }, '发现新版本 ' + up.remoteVersion),
+    el('div', { style: 'font-size:13px;color:var(--text-mute);margin-bottom:16px' },
+      '当前版本 ' + up.localVersion + '，可升级到 ' + up.remoteVersion + '。更新会自动备份旧版本，出问题可一键回滚。'),
+    notes,
     el('div', { class: 'modal-actions' },
       el('button', { class: 'btn ghost', onclick: closeModal }, '暂不更新'),
       el('button', {
-        class: 'btn',
+        class: 'btn primary',
         onclick: async function () {
           closeModal();
-          const r = await API.get('/api/remote-update').catch(function () { return null; });
+          toast('正在更新…');
+          const r = await API.get('/api/update-apply').catch(function () { return null; });
           if (r && r.ok) {
+            toast('更新完成，正在重启…', 'ok');
+            // 服务会重启（spawn 新进程 + 退出当前），等它重新起来再刷新页面。
+            // 轮询 /api/health，最多等 30 秒。
+            await waitServiceUp();
             location.reload();
           } else {
-            toast('更新失败，请稍后再试', 'error');
+            toast('更新失败：' + (r && r.error ? r.error : '未知错误'), 'error');
           }
         },
       }, '立即更新'),

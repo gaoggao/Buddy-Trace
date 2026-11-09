@@ -27,29 +27,14 @@ import { exportAgentArtifacts } from './wb-export.js';
 import { backupNow, backupStatus, saveBackupConfig, getBackupConfig, shouldAutoBackup, cleanupOld } from './backup.js';
 import { HELP } from './help-data.js';
 import { checkRemoteUpdate, applyRemoteUpdate, readCachedRemote, readRemoteImage } from './remote.js';
+import { checkUpdate, applyUpdate, rollback, hasBackup } from './updater.js';
+import { DEFAULT_PORTS } from './ports.js';
+import { VERSION } from './version.js';
+import { scheduleRestart } from './runtime.js';
 import {
   resolveUid, filterByUid, filterVisible, countByKind, canViewContent,
   currentLoginUid, groupMatesOf, mergeAccounts, separateAccount, unseparateAccount, groupStatus,
 } from './wb-privacy.js';
-
-/**
- * 端口备选列表
- *
- * 老板明确（2026-11-03）：
- *   「不要连起来，有些程序有可能把一片端口都占了。
- *     41829、48901、37062 就这样跳跃性地改端口，被占的几率小一些。」
- *
- * 所以：首选的 41829 保留（跟我们之前的约定一致），
- * 后面几个全部跳跃分布，避免"整片被占"时连续失败。
- * 每个数都避开常见服务的默认端口。
- */
-const DEFAULT_PORTS = [
-  41829,   // 首选（LBASE 约定的 WorkBuddy 端口）
-  42307,   // 跳跃 +478
-  44159,   // 跳跃 +1852
-  46309,   // 跳跃 +2150
-  48733,   // 跳跃 +2424
-];
 
 /**
  * 构建标记（每次进程启动生成一个）
@@ -156,7 +141,7 @@ export function createServer(store, opts = {}) {
         return sendJson(res, 200, {
           ok: true,
           name: 'Buddy Trace',
-          version: '0.1.0',
+          version: VERSION,
           stats: {
             total: mine.length,
             projects: projSet.size,
@@ -707,6 +692,40 @@ export function createServer(store, opts = {}) {
       if (route === 'GET /api/remote-update' || route === 'POST /api/remote-update') {
         const r = await applyRemoteUpdate(wbDataDir);
         return sendJson(res, 200, { ok: r.ok, remote: r.cfg || null });
+      }
+
+      // ── 软件版本增量更新（2.0）──
+      // 检测云端有没有新版本（比对 remote.json 的 version 字段）
+      if (route === 'GET /api/update-check') {
+        const r = await checkUpdate(wbDataDir);
+        return sendJson(res, 200, {
+          ok: true,
+          hasUpdate: r.hasUpdate,
+          remoteVersion: r.remoteVersion,
+          localVersion: r.localVersion,
+          notes: r.notes,
+        });
+      }
+
+      // 执行增量更新（用户点「更新」后调；更新的是 code/ 目录，非 exe）
+      if (route === 'GET /api/update-apply' || route === 'POST /api/update-apply') {
+        const r = await applyUpdate(wbDataDir);
+        // 更新成功 → 安排重启，让新代码立即生效
+        // 注意：先返回响应，再延迟重启（scheduleRestart 里 setTimeout 1200ms，
+        //       足够 sendJson 把响应写完）
+        if (r.ok) scheduleRestart();
+        return sendJson(res, 200, { ok: r.ok, error: r.error || null, version: r.version || null });
+      }
+
+      // 回滚到上一版（更新失败或新版本有问题时，用户点「回滚」）
+      if (route === 'GET /api/update-rollback' || route === 'POST /api/update-rollback') {
+        const r = rollback(wbDataDir);
+        return sendJson(res, 200, { ok: r.ok, error: r.error || null });
+      }
+
+      // 是否有可回滚的备份（前端决定是否显示「回滚」按钮）
+      if (route === 'GET /api/update-backup-status') {
+        return sendJson(res, 200, { ok: true, hasBackup: hasBackup() });
       }
 
       // 远程配置（本地缓存，前端渲染二维码入口用）

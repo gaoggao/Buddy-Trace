@@ -16,6 +16,8 @@ import { exec, spawn } from 'node:child_process';
 import { Store } from './store.js';
 import { Config } from './config.js';
 import { createServer, listenWithFallback } from './server.js';
+import { resolvePorts } from './ports.js';
+import { readRuntime, writeRuntime, existingInstance } from './runtime.js';
 
 const args = parseArgs(process.argv.slice(2));
 
@@ -61,12 +63,8 @@ function defaultDataDir() {
 
 const dataDir = path.resolve(args.data || defaultDataDir());
 // 端口备选：跳跃分布，避免"整片端口被占"时连续失败（老板 2026-11-03 要求）
-// 环境变量 BT_PORTS 可覆盖（分号分隔），方便部署时改
-const ports = args.port
-  ? [Number(args.port)]
-  : (process.env.BT_PORTS
-    ? process.env.BT_PORTS.split(';').map((s) => Number(s.trim())).filter(Boolean)
-    : [41829, 42307, 44159, 46309, 48733]);
+// 统一从 ports.js 拿，环境变量 BT_PORTS 可覆盖（分号分隔），方便部署时改
+const ports = resolvePorts({ portArg: args.port });
 
 // 启动前检查
 console.log('Buddy Trace 启动中…');
@@ -78,6 +76,22 @@ try {
 } catch (err) {
   console.error(`  ✗ 数据目录不可写: ${err.message}`);
   process.exit(1);
+}
+
+// ── 单实例检查（2026-11-08 加）──
+// 双击两次图标 / 计划任务与服务同时启动，都会造成两个实例各写各的库。
+// 这里读 runtime.json，发现已有一个活着的实例，就不再起第二个。
+//
+// 注意：必须在 new Store() 之前查 —— Store 构造器会打开索引文件，
+// 如果第二个实例先打开 Store 再退出，极端情况下会和第一个实例并发写 index.json。
+const alreadyPort = await existingInstance(dataDir);
+if (alreadyPort) {
+  console.log(`  已有实例在跑（端口 ${alreadyPort}），本进程退出`);
+  // 用户双击图标（没带 --no-open）→ 打开浏览器到已有实例，方便用户看到
+  if (!args['no-open']) {
+    openBrowser(`http://127.0.0.1:${alreadyPort}`);
+  }
+  process.exit(0);
 }
 
 const store = new Store(dataDir);
@@ -103,6 +117,9 @@ try {
   store.close();
   process.exit(1);
 }
+
+// 记录实际端口，供 watchdog / 导出链接等外部组件读取（不写死）
+writeRuntime(dataDir, { port: actualPort, pid: process.pid });
 
 // ── WorkBuddy 自动同步（全自动，用户不点任何按钮）──
 // 启动扫一次 + 之后每 30 分钟扫一次（BT_INTERVAL 可改）

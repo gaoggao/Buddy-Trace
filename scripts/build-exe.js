@@ -5,10 +5,15 @@
  *   「压缩包安装以后，生成的图标改成这个名字」
  *   「图标得做个 logo」
  *
- * 产出：一个单文件 exe，双击就跑，不需要用户装 Node.js。
+ * 2.0 增量更新架构（2026-11-08）：
+ *   exe 是「壳」，内置完整代码做兜底，优先加载旁边的 code/ 目录。
+ *   每次更新只换 code/，不用重下 110 MB 的 exe。
+ *   本脚本产出两样：
+ *     ① BuddyTrace.exe      壳 + 内置兜底代码
+ *     ② code-<版本>.zip     可增量更新的 src/ 代码
  *
  * 用法：
- *   node scripts/build-exe.js              # 打包 Windows exe
+ *   node scripts/build-exe.js              # 打包 Windows exe + code.zip
  *   node scripts/build-exe.js --all        # 打全部平台
  *   node scripts/build-exe.js --no-icon    # 不打图标（调试用）
  */
@@ -22,7 +27,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const DIST = path.join(ROOT, 'dist');
 const ICON = path.join(ROOT, 'assets', 'logo.ico');
-const ENTRY = path.join(ROOT, 'src', 'index.js');
+// 入口改成 shell.js：它是壳，负责「优先加载外部 code / 回退内置」
+const ENTRY = path.join(ROOT, 'src', 'shell.js');
+const SRC_DIR = path.join(ROOT, 'src');
 
 /** bun 可执行文件位置（spawn 需要绝对路径，bun.cmd 不行） */
 function findBun() {
@@ -48,6 +55,28 @@ const TARGETS = {
   macx: { flag: 'bun-darwin-x64', out: 'BuddyTrace-macos-x64' },
   linux: { flag: 'bun-linux-x64', out: 'BuddyTrace-linux-x64' },
 };
+
+/**
+ * 打增量更新包（tar.gz）：
+ * 把 src/ 整个目录打成 code-<版本>.tar.gz，tar 内路径是 src/*.js。
+ * 用户端 updater 解压到 exe 旁边的 code/ 目录，得到 code/src/*.js。
+ *
+ * 打包用 bsdtar（Windows 10+ 自带 C:\Windows\System32\tar.exe）。
+ */
+function buildCodePack() {
+  const out = path.join(DIST, `code-${pkg.version}.tar.gz`);
+  if (fs.existsSync(out)) fs.unlinkSync(out);
+
+  // bsdtar: --exclude 必须放在 -C 之前、被排除的模式之前
+  // 排除 shell.js（exe 入口）和 *.bak（历史残留，不该进增量包）
+  const args = ['--exclude', 'src/shell.js', '--exclude', '*.bak', '-czf', out, '-C', ROOT, 'src'];
+  execFileSync('tar', args, { stdio: 'inherit' });
+
+  if (!fs.existsSync(out)) throw new Error('增量包生成失败');
+  const kb = (fs.statSync(out).size / 1024).toFixed(1);
+  console.log(`  ✓ 增量包 code-${pkg.version}.tar.gz  ${kb} KB`);
+  return out;
+}
 
 function build(which) {
   const t = TARGETS[which];
@@ -98,6 +127,15 @@ function main() {
       outs.push(build(w));
     } catch (e) {
       console.error('  ✗ ' + w + ' 失败: ' + e.message);
+    }
+  }
+
+  // 增量更新包（只有打 win 时生成；mac/linux 暂不发布增量）
+  if (which.includes('win')) {
+    try {
+      outs.push(buildCodePack());
+    } catch (e) {
+      console.error('  ✗ 增量包失败: ' + e.message);
     }
   }
 

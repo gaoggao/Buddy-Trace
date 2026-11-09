@@ -15,6 +15,7 @@
 import crypto from 'node:crypto';
 import { scan, captureLoginAccount, loadAccounts, harvestAccountNamesToStore } from './wb-sync.js';
 import { backupNow, shouldAutoBackup } from './backup.js';
+import { DEFAULT_PORTS } from './ports.js';
 
 const DEFAULT_INTERVAL_MS = 30 * 60 * 1000;
 
@@ -31,7 +32,7 @@ export class WbSyncer {
     this.dataDir = opts.dataDir;
     // port 可以是数字，也可以是函数 —— 函数形式能跟着实际监听端口变化
     // （老板 2026-11-03：端口变了，引导语里的地址也得跟着变）
-    this._port = opts.port || Number(process.env.BT_PORT || 41829);
+    this._port = opts.port || Number(process.env.BT_PORT || DEFAULT_PORTS[0]);
     this.intervalMs = opts.intervalMs
       || Number(process.env.BT_INTERVAL || DEFAULT_INTERVAL_MS);
     this.mtimeCache = new Map();
@@ -172,7 +173,7 @@ export class WbSyncer {
         exported = exportAgentArtifacts({
           store: this.store,
           dataDir: this.dataDir,
-          port: this.port || 41829,
+          port: this.port || DEFAULT_PORTS[0],
         });
       } catch (e) {
         exported = { ok: false, error: String(e && e.message || e) };

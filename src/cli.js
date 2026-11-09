@@ -248,7 +248,8 @@ async function main() {
 
         // 端口
         const net = await import('node:net');
-        for (const port of [41829, 41830, 41831]) {
+        const { DEFAULT_PORTS } = await import('./ports.js');
+        for (const port of DEFAULT_PORTS) {
           const free = await new Promise((resolve) => {
             const srv = net.createServer();
             srv.once('error', () => resolve(false));

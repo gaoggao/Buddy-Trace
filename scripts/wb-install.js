@@ -22,6 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { DEFAULT_PORTS } from '../src/ports.js';
 
 const args = {};
 for (let i = 2; i < process.argv.length; i++) {
@@ -29,14 +30,13 @@ for (let i = 2; i < process.argv.length; i++) {
   if (a.startsWith('--')) args[a.slice(2)] = process.argv[i + 1]?.startsWith('--') ? true : (process.argv[++i] ?? true);
 }
 
-const PORT = args.port || 41829;
+const PORT = args.port || DEFAULT_PORTS[0];
 const DRY = !!args.dry;
 const REVERT = !!args.revert;
 // 默认 false：不写 WorkBuddy 的文件（法律风险）。
 // 只有用户明确加 --write 才写。
 const WRITE = !!args.write;
 const WB = process.env.BT_WB_HOME || path.join(os.homedir(), '.workbuddy');
-
 // 数据目录（决定导出文件在哪）
 //
 // 注意：脚本在 code/scripts/ 下，而数据目录在项目的 data/（跟 code 平级）。

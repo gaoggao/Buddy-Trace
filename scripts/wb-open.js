@@ -21,10 +21,11 @@ import path from 'node:path';
 import http from 'node:http';
 import { spawn, execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_PORTS } from '../src/ports.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
-const PORTS = [41829, 42307, 44159, 46309, 48733];
+const PORTS = DEFAULT_PORTS;
 
 /** 探测单个端口，返回 true/false */
 function probe(port, timeoutMs = 2000) {

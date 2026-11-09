@@ -12,10 +12,12 @@
  *   list / kv / table / menu / case / qa
  */
 
+import { VERSION } from './version.js';
+
 export const HELP = {
   title: '帮助',
   subtitle: '遇到问题搜一下 —— 这里都用大白话说清楚',
-  version: '0.1.0',
+  version: VERSION,
 
   sections: [
     {

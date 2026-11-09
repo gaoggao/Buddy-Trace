@@ -19,7 +19,7 @@
 
 #define AppName        "溯源 · Buddy Trace"
 #define AppNameEn      "Buddy Trace"
-#define AppVersion     "0.1.0"
+#define AppVersion     "2.0.0"
 #define AppPublisher   "Buddy Trace"
 #define AppURL         "https://github.com/gaoggao/Buddy-Trace"
 #define AppExeName     "BuddyTrace.exe"
@@ -86,6 +86,10 @@ Source: "assets\run-hidden.vbs"; DestDir: "{app}"; Flags: ignoreversion
 ; 注册计划任务的 PowerShell 脚本（比 schtasks 可靠，能设 Hidden）
 Source: "assets\install-tasks.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\使用说明书.docx"; DestDir: "{app}\docs"; Flags: ignoreversion skipifsourcedoesntexist
+; ── 2.0 增量更新：初始业务代码（可单独更新）──
+; 装上就带一份 code\src\，exe 启动时优先加载这里；之后更新只换这个目录
+; 排除 shell.js：它是 exe 的入口，已经打进 exe 里了
+Source: "src\*.js"; DestDir: "{app}\code\src"; Excludes: "shell.js"; Flags: ignoreversion
 
 
 [Icons]
@@ -112,6 +116,8 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM {#AppExeName}"; Flags: runhi
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\docs"
+Type: filesandordirs; Name: "{app}\code"
+Type: filesandordirs; Name: "{app}\code.bak"
 Type: files; Name: "{app}\logo.ico"
 Type: files; Name: "{app}\install-tasks.ps1"
 Type: files; Name: "{app}\install-tasks.log"

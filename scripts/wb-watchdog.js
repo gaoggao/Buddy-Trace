@@ -35,12 +35,13 @@ import os from 'node:os';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_PORTS } from '../src/ports.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 
-/** 端口备选（跟 index.js 保持一致，跳跃分布） */
-const PORTS = [41829, 42307, 44159, 46309, 48733];
+/** 端口备选（统一来自 src/ports.js） */
+const PORTS = DEFAULT_PORTS;
 
 /** 日志目录 */
 const LOG_DIR = path.join(ROOT, '..', 'data', 'logs');
