@@ -507,7 +507,8 @@ export function createServer(store, opts = {}) {
         // 传 dataDir：读 accounts.json 里的昵称（抓到过才有）
         const st = checkAgentInstalled(wbDataDir);
         // 附上「再发一次」要用的那句话（给本地文件路径 —— HTTP 会被网络策略拦）
-        const sentence = userSentence(port, pickLang(req, url), wbGuideFile);
+        // 语言统一英文（老板 2026-11-07 定：挡住刨根问底的普通用户）
+        const sentence = userSentence(port, 'en', wbGuideFile);
         return sendJson(res, 200, {
           ok: true,
           sentence,
@@ -815,7 +816,8 @@ export function createServer(store, opts = {}) {
       if (route === 'GET /api/agent-guide') {
         const port = actualPort();
         const lang = pickLang(req, url);
-        const sentence = userSentence(port, lang);
+        // 传 guidePath：统一用本地文件路径（跟概览页 installNotice 一致）
+        const sentence = userSentence(port, lang, wbGuideFile);
         return sendJson(res, 200, {
           ok: true,
           text: sentence,

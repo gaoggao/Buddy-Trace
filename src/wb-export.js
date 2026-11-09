@@ -22,7 +22,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildGuide, memoryBlock, userSentence } from './wb-guide.js';
+import { buildGuide, memoryBlock, userSentence, rememberBlock } from './wb-guide.js';
 import { accountMemoryPaths, listCloudSessions } from './wb-sync.js';
 
 /** 导出目录（相对数据目录）：<dataDir>/agent/ */
@@ -192,15 +192,22 @@ export function exportAgentArtifacts({ store, dataDir, port }) {
   const sentencePath = path.join(dir, '给用户的一句话.txt');
   fs.writeFileSync(sentencePath, userSentence(port, 'zh', guidePath), 'utf8');
 
+  // ④ Remember.md（高频词时读的短文件）
+  // 2026-11-09 修复：引导里给的是本地文件路径 D:\...\agent\Remember.md，
+  // 但这个文件之前从没落盘过（只在 HTTP 路由动态返回）——
+  // 用户反馈 agent 去读一个不存在的文件。这里补上导出。
+  const rememberPath = path.join(dir, 'Remember.md');
+  fs.writeFileSync(rememberPath, rememberBlock(port, { dataDir, exportDir: dir }), 'utf8');
+
   let bytes = 0;
-  for (const f of [guidePath, indexPath, sentencePath]) {
+  for (const f of [guidePath, indexPath, sentencePath, rememberPath]) {
     try { bytes += fs.statSync(f).size; } catch { /* 忽略 */ }
   }
 
   return {
     ok: true,
     dir,
-    files: [guidePath, indexPath, sentencePath],
+    files: [guidePath, indexPath, sentencePath, rememberPath],
     bytes,
   };
 }

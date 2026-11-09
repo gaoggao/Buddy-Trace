@@ -1031,14 +1031,10 @@ async function renderOverview(main) {
     }, t('installAllOk', { n: inst.total })));
   }
 
-  if (list.ok && list.items.length > 0) {
-    body.append(
-      el('div', { style: 'margin-top:32px' },
-        el('div', { class: 'page-head' }, el('h1', { style: 'font-size:15px' }, t('recentTitle'))),
-        itemList(list.items, false),
-      ),
-    );
-  } else {
+  // ── 首页不再显示「最近写入」（老板 2026-11-09）──
+  // 首页内容太多，很多人分不清、也不愿意看那么多。
+  // 想查最近内容，点左侧「上下文记忆库」「溯源库」等具体库去看。
+  if (list.ok && list.items.length === 0) {
     body.append(firstRunGuide());
   }
 }
@@ -1109,10 +1105,23 @@ function installNotice(inst) {
 
   // 一句话说清怎么做（写多了用户觉得复杂）
   box.append(el('div', {
-    style: 'font-size:13px;color:var(--text);line-height:1.6;margin-bottom:8px',
+    style: 'font-size:13px;color:var(--text);line-height:1.6;margin-bottom:10px',
   }, t('installHowTo')));
 
-  box.append(cmdBox(inst.sentence));
+  // ── 复制给 WorkBuddy 的那段话：单独一块、醒目背景色 ──
+  // 老板 2026-11-09：这段话淹没在文字里，很多人找不到。
+  // 单独做一块，用强调色背景，一眼能看到"就是复制这个"。
+  const copyBlock = el('div', {
+    style: 'padding:12px 14px;background:var(--bg);border:2px solid var(--accent);' +
+      'border-radius:8px;margin-bottom:4px',
+  });
+  copyBlock.append(
+    el('div', {
+      style: 'font-size:13px;font-weight:700;color:var(--accent-deep);margin-bottom:8px',
+    }, '复制下面这段话，发到 WorkBuddy 的聊天框内，即可让你的 WorkBuddy 变得更聪明。'),
+    cmdBox(inst.sentence),
+  );
+  box.append(copyBlock);
 
   return box;
 }

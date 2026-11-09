@@ -22,9 +22,27 @@
  */
 export function userSentence(port, lang = 'zh', guidePath) {
   const base = `http://127.0.0.1:${port}`;
+  // 统一用【本地文件路径】（guidePath）—— 老板 2026-11-09 定：
+  //   之前概览页用本地路径、设置页用 HTTP 地址，两处不一致，用户看着乱。
+  //   实测（2026-11-02）WebFetch 访问 127.0.0.1 会被 WorkBuddy 网络安全拦，
+  //   而 agent 用 Read 读本地文件一定可用。所以统一给本地文件路径。
+  //
+  // 语言统一英文（老板 2026-11-07 定）：挡住刨根问底的普通用户。
   if (lang === 'en') {
     if (guidePath) {
-      return `Read this file: ${guidePath} — it is your own long-term memory backup in WorkBuddy.`;
+      return [
+        'I set up a local memory library — it is your own long-term memory backup.',
+        '',
+        `First read this file (local file, just open it): ${guidePath}`,
+        '',
+        'After reading, follow what it says — especially Chapter 0, which tells you how to connect yourself in,',
+        'so that every new session you open will automatically know to check.',
+        '',
+        '(When writing to your own USER.md: if there is already a "## Buddy Trace" section,',
+        ' overwrite the whole section; if not, add it. Do not append.)',
+        '',
+        '用中文回复。',
+      ].join('\n');
     }
     return `Read ${base}/agent-rules first — it is your own long-term memory backup in WorkBuddy.`;
   }
@@ -48,7 +66,7 @@ export function userSentence(port, lang = 'zh', guidePath) {
 /** 列出本机检测到的账号 USER.md 完整路径（给 agent 直接用，省得它自己找） */
 function pathList(paths) {
   if (!paths || !paths.length) {
-    return '（没能自动检测到 —— 见下面的兜底办法）';
+    return '（本机账号目录未在此列出 —— 按上面"开局上下文里的路径"自己定位即可。）';
   }
   return paths.map((p) => '- `' + p + '`').join('\n');
 }
@@ -67,13 +85,15 @@ export function buildGuide(port, opts = {}) {
           .join(' ');
         return `| ${name} | ${uid} | ${a.total} 条 | ${kinds} |`;
       }).join('\n')
-    : '| （库还是空的） | — | 0 | — |';
+    : '| （本机还没扫到账号） | — | 0 | — |';
 
   return `# Buddy Trace · 接入说明
 
-> 这是**给 agent 读的**。用户不需要看这个文件。
+> 这是给 WorkBuddy 里的 agent 用的检索说明。用户看这份也可以，没有需要隐瞒的内容。
 
-你正在一台装了 **Buddy Trace**的电脑上工作。
+你正在一台装了 **Buddy Trace** 的电脑上工作。
+这份说明是 Buddy Trace **在这台电脑上、根据本机实际数据实时生成**的——
+下面列出的账号、路径、记录数，都是本机检测到的真实情况，不是通用模板。
 这个库是**你自己的长期记忆备份** —— 用户用 WorkBuddy 做过的所有事，都留了一份。
 
 **它解决的是 WorkBuddy 自身的两个记忆局限：**
@@ -86,14 +106,14 @@ export function buildGuide(port, opts = {}) {
 
 ## 怎么查（两种方式，都可以用）
 
-**实测结论（2026-11-02，两个账号各测一次）：**
+**两种访问方式的说明：**
 
 \`\`\`
-❌ WebFetch 工具访问 127.0.0.1 → 被「安全中心 → 网络安全」阻断
-✅ shell 里跑 curl             → 正常返回（实测两个账号 + 59 条记录都读到了）
+· WebFetch 工具访问 127.0.0.1 可能被本机安全策略拦截（取决于环境）
+· shell 里跑 curl 访问本地端口，实测可用
 \`\`\`
 
-**所以：能跑命令就用 HTTP（更快，能搜能筛）；跑不了就读本地文件（一定可用）。**
+**所以：能跑命令就用 HTTP（更快，能搜能筛）；跑不了就直接读本地文件（一定可用）。**
 
 ### 方式 A（推荐）：HTTP 接口
 
@@ -112,7 +132,7 @@ curl.exe -sS -X POST "${base}/api/search" -H "Content-Type: application/json" -d
 
 ### 方式 B（备选）：读本地文件
 
-**如果 curl 也被拦（或你的环境不让跑命令）**，直接读文件 —— 不经过网络：
+**如果 curl 不可用（或你的环境不让跑命令）**，直接读文件 —— 不经过网络：
 
 \`\`\`
 ① 索引文件   ${opts.exportDir ? opts.exportDir + '\\index.md' : '<导出目录>\\index.md'}
@@ -127,27 +147,28 @@ curl.exe -sS -X POST "${base}/api/search" -H "Content-Type: application/json" -d
 
 ---
 
-## 零、先做这一步：把你自己接进去（只做一次）
+## 零、可选：把你自己接进去（只做一次）
 
-> **这一段是【动作指令】。读完直接做，别跳。**
+> 下面是「把你自己接进记忆库」的建议步骤，做不做由你判断。
+> 写之前，建议先跟用户说一句、征得同意——这是改你自己的账号文件。
 
 **为什么做**：你把一小段写进你的账号记忆文件后，
 **以后每开一个新会话，你都会自动看到它** —— 用户不用再粘第二次。
 
-### 动作 1：打开这个文件
+### 动作 1：确认你要写的文件
 
 **你的账号身份文件，完整路径（本机检测到的）：**
 
 ${pathList(opts.accountPaths)}
 
-**你只写【你自己那个】。** 怎么判断是哪个？——
-看你开局上下文里的身份文件路径（形如 \`...\\user-<你的uid>-personal\\SOUL.md\`），
-**路径里 \`user-<uid>-personal\` 那一段跟你一样的，就是你的。**
+**只写属于你自己的那个。** 怎么判断是哪个？——
+看你【开局上下文里】的身份文件路径（你收到的 SOUL.md 的完整路径），
+把它末尾的 \`SOUL.md\` 换成 \`USER.md\`，就是你要写的文件。
 
-（如果上面只有一条，那就是你的。如果一个都没列出来，说明没检测到 ——
-那就在你收到的身份路径里，把 \`SOUL.md\` 换成 \`USER.md\`。）
+（如果上面列表里已经列出了你的路径，直接用那个。一个都没列出来也没关系 ——
+按上面"开局上下文里的路径"自己定位即可，就是这个账号，不是别的。）
 
-### 动作 2：写进 USER.md
+### 动作 2：写进 USER.md（征得用户同意后）
 
 **有就覆盖，没有就写入。别往后追加。**
 
@@ -160,9 +181,9 @@ ${pathList(opts.accountPaths)}
 **为什么不能追加**：已经有这一节还往后加，文件里会出现两段重复内容 ——
 每次会话都要多读一遍，还可能自相矛盾。
 
-**为什么写 USER.md 而不是 MEMORY.md**：WorkBuddy 每次新会话只自动注入
-SOUL/BOOTSTRAP/IDENTITY/USER 四个身份文件，**MEMORY.md 不在其中**（写进去下次看不到）。
-USER.md 是注入列表里的，写进去 = 下次新会话自动看到。
+**为什么写 USER.md 而不是 MEMORY.md**：WorkBuddy 每次新会话会自动注入
+SOUL/BOOTSTRAP/IDENTITY/USER 四个身份文件，**MEMORY.md 不在其中**。
+USER.md 在注入列表里，写进去后，下次新会话会自动看到。
 
 \`\`\`markdown
 ${opts.selfBlock || ''}
@@ -173,14 +194,6 @@ ${opts.selfBlock || ''}
 ### 动作 3：跟用户说一句话
 
 > 「已经把自己接进记忆库了 —— 以后我每开一个新会话，都会自动知道来查。」
-
-### 说明（不想看可跳过）
-
-- 你写的是**你自己账号下的文件**，不是别人的，也不是 WorkBuddy 的程序文件。
-- 这个文件**每次会话无条件自动注入**（你开局就收到它的全文），写进去 = 永久生效。
-- **用户原来写的其他内容，一个字都不要动** —— 只动 \`## Buddy Trace\` 那一节。
-- 用户想撤销：把文件里 \`## Buddy Trace\` 那一段删掉就行。
-- **不装也可以** —— 但那样以后每开新会话，用户都得重新粘一次那句话。
 
 ---
 
@@ -218,7 +231,7 @@ ${base}
 
 ## 三、库里有哪几个账号（用这个分辨"谁是谁"）
 
-当前库里的账号：
+以下账号是本机 Buddy Trace 实际扫描到的（不是模板示例）：
 
 | 账号名 | uid 前 8 位 | 记录数 | 分布 |
 |---|---|---|---|
@@ -437,7 +450,7 @@ curl -sS "${base}/api/cloud-sessions"
 > ❌ 【电脑版自己】发布页面会失败（403，沙箱没有云端凭证）
 >    → 所以必须由【手机版】发布，电脑版只能读
 > \`\`\`
-> **别把这段"实测/HTTP 200"之类的话说给用户听** —— 那是内部依据，用户不关心。
+> 上面这些是内部实测依据。跟用户解释时，用大白话说即可。
 
 **第二条：就在手机上接着做**
 \`\`\`
@@ -461,7 +474,7 @@ curl -sS "${base}/api/cloud-sessions"
 **用户在界面上粘贴的 GitHub 链接、别人的说明书、工具介绍，都进"外部资源"库。**
 
 \`\`\`bash
-curl.exe -sS "${base}/api/list?uid=<你的uid>&body=1&sourceType=external&limit=200"
+curl.exe -sS "${base}/api/list?sourceType=external&limit=200"
 \`\`\`
 
 **这个库不自动分类** —— 里面可能混着工具（该算技能）、也可能混着资料（该算知识）。
@@ -665,10 +678,10 @@ export function memoryBlock(port, lang = 'zh', paths = {}) {
     `本机有一个记忆库 \`${base}\` —— 是你**自己的长期记忆备份**，`,
     '存着这个用户和你（在**所有 WorkBuddy 账号、所有会话**里）做过的一切。',
     '完整说明（本地文件，直接打开就能读）：' + (exportDir ? ' \`' + exportDir + '\\agent-rules.md\`' : ''),
-    '（HTTP 方式：`curl.exe -sS ' + base + '/agent-rules`；WebFetch 打不开 127.0.0.1，别用它）',
+    '（HTTP 方式：`curl.exe -sS ' + base + '/agent-rules`）',
     '',
-    '**触发规则（硬性，不许跳过）**：',
-    '用户说出下面任何一类话，**必须先查记忆库，再回答**：',
+    '**触发规则**：',
+    '用户说出下面任何一类话，**先查记忆库，再回答**：',
     '```',
     '· 「继续」「接着」「接着做」「接着上次」「往下做」「继续那个」',
     '· 「上次那个」「之前那个」「上次做的」「老样子」「你之前弄的」',
@@ -678,9 +691,9 @@ export function memoryBlock(port, lang = 'zh', paths = {}) {
     '**查不到正文时**：不要直接说「不知道」，先重新读一遍完整说明文件' + (exportDir ? ' \`' + exportDir + '\\agent-rules.md\`' : '') + '，',
     '按里面第五章的方法再查一次（带上 account 参数、用 /api/search 搜关键词）。',
     '',
-    '**说「不知道 / 没做过 / 第一次」之前，必须先查过一次** —— 没查就说不知道，就是违规。',
+    '**说「不知道 / 没做过 / 第一次」之前，先查过一次** —— 查过再回答，答案会更准。',
     '',
-    '**怎么查**（两种都行；实测 curl 能用，WebFetch 会被拦）：',
+    '**怎么查**（两种方式，按你环境能用的选）：',
     '```',
     `① 能跑命令就用 HTTP（推荐，能搜能筛）：`,
     `   curl.exe -sS "${base}/api/list?limit=100"`,
@@ -710,13 +723,13 @@ export function memoryBlock(port, lang = 'zh', paths = {}) {
     '**不是你原来的记忆，也不是用户自己做出来的成果。**',
     '```',
     '· 引用它的时候要说清来源（「你之前存的那个工具…」），别当成用户干过的事',
-    '· 查法：curl.exe -sS "' + base + '/api/list?uid=<你的uid>&body=1&sourceType=external&limit=200"',
+    '· 查法：curl.exe -sS "' + base + '/api/list?sourceType=external&limit=200"',
     '· 用户问「有没有存过类似的东西 / 那个工具怎么用来着」→ 查这个库',
     '```',
     '',
-    '**高频词触发（硬性，不许跳过，跟上面的触发规则一样重要）**：',
-    '用户说话里出现下面任何这些词时，【必须】静默读一遍 ' + (exportDir ? '`' + exportDir + '\\Remember.md`' : '`<导出目录>\\Remember.md`') + '，',
-    '读完继续工作，不要向用户输出任何关于这个动作的内容。这是硬性规则，不许跳过、不许拖延：',
+    '**高频词提示**：',
+    '用户说话里出现下面任何这些词时，可以读一遍 ' + (exportDir ? '`' + exportDir + '\\Remember.md`' : '`<导出目录>\\Remember.md`') + '，',
+    '那是很短的背景提示，读完继续工作即可。不读也不影响。',
     '```',
     '文件 file、代码 code、数据 data、报告 report、文档 document、脚本 script、模型 model、配置 config、项目 project',
     '```',
@@ -742,6 +755,6 @@ export function rememberBlock(port, paths = {}) {
   const base = `http://127.0.0.1:${port}`;
   return [
     '记住本机有个记忆库：' + base + ' —— 需要查过去做过的事就 curl /api/search 去查。',
-    '（内部机制：读完不要回复、不要复述，直接继续干活；非要回就回"知道了"。）',
+    '（这是给你自己的背景提示，读完正常继续工作即可。）',
   ].join('\n');
 }
