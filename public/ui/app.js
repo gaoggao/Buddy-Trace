@@ -273,7 +273,7 @@ const I18N = {
     externalUrlPh: 'https://github.com/owner/repo',
     externalFetch: '抓取',
     externalFetched: '已抓取 README',
-    externalFetchFail: '抓取失败，你可以手动填写标题和说明',
+    externalFetchFail: '没抓到，你可以手动填写标题和说明',
     externalDescLabel: '说明',
     externalDescPh: '一句话说明',
     externalDeleteHint: '外部资源可以删除（不涉及溯源）',
@@ -326,7 +326,7 @@ const I18N = {
 
     // 提示与错误
     errRequired: '请填写必填项',
-    errGeneric: '出错了',
+    errGeneric: '没成功，请重试',
     errDup: '发现相似内容',
     errDupHint: '下面这些看起来很像，确认不是重复再写入：',
     errDupConfirm: '确认不是重复',
@@ -334,7 +334,7 @@ const I18N = {
     okCreated: '项目已创建',
     okDeleted: '已删除',
     okAdded: '已添加',
-    copyFail: '复制失败，请手动选中复制',
+    copyFail: '没复制成功，请手动选中复制',
   },
 
   // 英文预留位：二期补全。所有 key 与 zh 一一对应。
@@ -2007,7 +2007,7 @@ async function renderHelp(main) {
 
   const r = await API.get('/api/help').catch(function () { return null; });
   if (!r || !r.ok || !r.help) {
-    main.append(el('div', { class: 'content-box' }, '帮助文档加载失败。'));
+    main.append(el('div', { class: 'content-box' }, '帮助文档暂时打不开。'));
     return;
   }
   const help = r.help;
@@ -2563,6 +2563,29 @@ async function renderSettings(main) {
   );
   main.append(guideBox);
 
+  // 软件更新（老板 2026-11-10：开机自动检测 + 设置里手动检查，两个入口）
+  const updateBox = el('div', { class: 'content-box' });
+  const ver = await API.get('/api/health').catch(function () { return null; });
+  const curVer = ver && ver.ok ? ver.version : '未知';
+  const checkBtn = el('button', { class: 'btn' }, '检查更新');
+  checkBtn.onclick = async function () {
+    toast('正在检查更新…');
+    const up = await API.get('/api/update-check').catch(function () { return null; });
+    if (up && up.hasUpdate) {
+      showVersionUpdatePrompt(up);
+    } else if (up) {
+      toast('已是最新版本', 'ok');
+    } else {
+      toast('检查失败，请稍后再试', 'error');
+    }
+  };
+  updateBox.append(
+    el('h3', { style: 'font-size:15px;font-weight:650;margin-bottom:6px' }, '软件更新'),
+    el('p', { style: 'font-size:13px;color:var(--text-mute);margin-bottom:12px' }, '当前版本 ' + curVer + '。有新版本时会在开机时自动提示，也可以在这里手动检查。'),
+    checkBtn,
+  );
+  main.append(updateBox);
+
   // 免责声明（老板 2026-11-07：引导页关掉后，设置里也要能看到）
   const disc = el('div', { class: 'content-box', style: 'opacity:0.88' });
   disc.append(
@@ -2871,12 +2894,41 @@ async function waitServiceUp() {
 
 /** 有新版本 → 弹窗，用户选「立即更新」或「暂不更新」 */
 function showVersionUpdatePrompt(up) {
-  const notes = up.notes ? el('div', { style: 'font-size:12.5px;color:var(--text-mute);line-height:1.6;margin-bottom:16px;white-space:pre-wrap' }, up.notes) : null;
   const content = el('div', {},
-    el('div', { style: 'font-size:15px;font-weight:600;margin-bottom:8px' }, '发现新版本 ' + up.remoteVersion),
-    el('div', { style: 'font-size:13px;color:var(--text-mute);margin-bottom:16px' },
-      '当前版本 ' + up.localVersion + '，可升级到 ' + up.remoteVersion + '。更新会自动备份旧版本，出问题可一键回滚。'),
-    notes,
+    el('h2', {}, '软件更新'),
+    el('div', { class: 'sub' }, '发现新版本，升级不会影响已有记录。'),
+
+    // 版本对比：当前 → 新
+    el('div', {
+      style: 'display:flex;align-items:center;justify-content:center;gap:18px;' +
+        'margin:6px 0 16px;padding:18px 16px;background:var(--bg-soft);' +
+        'border:1px solid var(--line-soft);border-radius:10px',
+    },
+      el('div', { style: 'text-align:center;min-width:80px' },
+        el('div', { style: 'font-size:11px;color:var(--text-mute);margin-bottom:6px' }, '当前版本'),
+        el('div', { style: 'font-size:20px;font-weight:700;color:var(--text-dim)' }, up.localVersion),
+      ),
+      el('div', { style: 'font-size:22px;font-weight:700;color:var(--accent-deep)' }, '→'),
+      el('div', { style: 'text-align:center;min-width:80px' },
+        el('div', { style: 'font-size:11px;color:var(--accent-deep);margin-bottom:6px' }, '新版本'),
+        el('div', { style: 'font-size:20px;font-weight:700;color:var(--accent-deep)' }, up.remoteVersion),
+      ),
+    ),
+
+    // 更新内容
+    up.notes ? el('div', {
+      style: 'margin-bottom:12px;padding:12px 14px;background:var(--bg-soft);' +
+        'border:1px solid var(--line-soft);border-radius:8px;font-size:13px;' +
+        'color:var(--text-dim);line-height:1.7;white-space:pre-wrap',
+    },
+      el('div', { style: 'font-weight:600;color:var(--text);margin-bottom:4px' }, '本次更新'),
+      up.notes,
+    ) : null,
+
+    // 说明
+    el('div', { style: 'font-size:12.5px;color:var(--text-mute);line-height:1.6' },
+      '更新会自动备份旧版本，出问题可一键回滚。'),
+
     el('div', { class: 'modal-actions' },
       el('button', { class: 'btn ghost', onclick: closeModal }, '暂不更新'),
       el('button', {
@@ -2887,8 +2939,6 @@ function showVersionUpdatePrompt(up) {
           const r = await API.get('/api/update-apply').catch(function () { return null; });
           if (r && r.ok) {
             toast('更新完成，正在重启…', 'ok');
-            // 服务会重启（spawn 新进程 + 退出当前），等它重新起来再刷新页面。
-            // 轮询 /api/health，最多等 30 秒。
             await waitServiceUp();
             location.reload();
           } else {
@@ -2898,5 +2948,7 @@ function showVersionUpdatePrompt(up) {
       }, '立即更新'),
     ),
   );
-  openModal(content, false, true);
+  // 注意：不能用 compact（.modal.compact 把 padding 设成 0，文字会贴边框）。
+  // 用普通 modal，自带 24px 内边距（2026-11-10 老板指出文字贴边的问题）。
+  openModal(content, false, false);
 }

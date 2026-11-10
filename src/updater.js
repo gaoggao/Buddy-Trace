@@ -180,7 +180,11 @@ export async function applyUpdate(dataDir, cfg = null) {
 
   // ④ 解压覆盖
   try {
-    extractTarGz(buf, path.dirname(codeDir));   // 解压到 exe 目录，得到 code/src/...
+    // 增量包 tar 内路径是 src/...（build-exe.js 用 `tar -C ROOT src` 打的），
+    // 所以要解压到 codeDir 本身，得到 code/src/...；
+    // 之前误写成 path.dirname(codeDir)（= exe 目录），会解压成 exe/src/...，
+    // 导致"更新成功但代码没到位"的假成功（2026-11-10 修复）。
+    extractTarGz(buf, codeDir);
   } catch (e) {
     // 解压失败 → 回滚
     try { fs.rmSync(codeDir, { recursive: true, force: true }); } catch { /* 忽略 */ }

@@ -153,6 +153,21 @@ console.log('  按 Ctrl+C 停止');
 
 if (!args['no-open']) {
   openBrowser(base);
+} else {
+  // ── 计划任务开机启动（--no-open）：平时静默，有新版本时主动弹更新提示 ──
+  // 老板 2026-11-10：用户开机只启动服务、不开界面，更新弹窗（在浏览器里）永远看不到。
+  // 改成：后台异步检测更新（不阻塞启动、不拖慢开机），
+  //       有更新 → 主动打开界面弹「发现新版本」；没更新 → 保持无感。
+  (async () => {
+    try {
+      const { checkUpdate } = await import('./updater.js');
+      const up = await checkUpdate(dataDir);
+      if (up && up.hasUpdate) {
+        console.log(`  发现新版本 ${up.remoteVersion}，打开界面提示更新`);
+        openBrowser(base);
+      }
+    } catch (e) { /* 检测失败就静默，不打扰用户 */ }
+  })();
 }
 
 // 优雅退出
