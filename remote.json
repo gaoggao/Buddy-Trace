@@ -1,11 +1,1 @@
-{
-  "qr": {
-    "enabled": true,
-    "image": "qr.png",
-    "title": "加入交流群"
-  },
-  "version": "2.1.3",
-  "code": "code-2.1.3.tar.gz",
-  "sha256": "04e49353914aefe6ad806ffff754371d634b57deeeac1cb6e4b99ded8506a00b",
-  "notes": "更新提示改进：\n· 开机自动检测更新并提示\n· 设置页新增「检查更新」入口\n· 更新弹窗重新排版"
-}
+{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "2.1.4", "code": "code-2.1.4.tar.gz", "sha256": "d762d70f2818fb58b2ba9aaa548c6173436ed11b9488f5bb29d81fbc8ba6972a", "notes": "2.1.4 测试版：\n· 验证开机自动弹更新\n· 验证设置页检查更新\n· 验证更新弹窗新排版"}
