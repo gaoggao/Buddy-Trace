@@ -1,1 +1,1 @@
-{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "2.1.5", "code": "code-2.1.5.tar.gz", "sha256": "baed87dd92340bfaa09b591f64a429db1e1b93464bd50f059828c21a37a497cc", "notes": "2.1.5：修复更新弹窗文字贴边（内边距）"}
+{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "2.1.6", "code": "code-2.1.6.tar.gz", "sha256": "51fa0d074bcb7ebe6e92fa07a6a8d253cb426fd467b0dc1a13a910a9d2d5adaf", "notes": "2.1.6：验证更新弹窗留白效果"}
