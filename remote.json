@@ -4,8 +4,8 @@
     "image": "qr.png",
     "title": "加入交流群"
   },
-  "version": "2.1.2",
-  "code": "code-2.1.2.tar.gz",
-  "sha256": "4cb04b8afcef9815867df05b25e4e724410b56cdac876811d9be053ff3b53be5",
-  "notes": "测试增量更新：2.1.1 → 2.1.2"
+  "version": "2.1.3",
+  "code": "code-2.1.3.tar.gz",
+  "sha256": "04e49353914aefe6ad806ffff754371d634b57deeeac1cb6e4b99ded8506a00b",
+  "notes": "更新提示改进：\n· 开机自动检测更新并提示\n· 设置页新增「检查更新」入口\n· 更新弹窗重新排版"
 }
