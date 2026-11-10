@@ -1,1 +1,11 @@
-{"qr":{"enabled":true,"image":"qr.png","title":"加入交流群"}}
+{
+  "qr": {
+    "enabled": true,
+    "image": "qr.png",
+    "title": "加入交流群"
+  },
+  "version": "2.1.2",
+  "code": "code-2.1.2.tar.gz",
+  "sha256": "4cb04b8afcef9815867df05b25e4e724410b56cdac876811d9be053ff3b53be5",
+  "notes": "测试增量更新：2.1.1 → 2.1.2"
+}
