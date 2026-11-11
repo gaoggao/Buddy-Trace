@@ -85,6 +85,8 @@ Source: "assets\logo.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "assets\run-hidden.vbs"; DestDir: "{app}"; Flags: ignoreversion
 ; 注册计划任务的 PowerShell 脚本（比 schtasks 可靠，能设 Hidden）
 Source: "assets\install-tasks.ps1"; DestDir: "{app}"; Flags: ignoreversion
+; 匿名安装计数（安装完成时执行一次，失败静默）
+Source: "assets\install-ping.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\使用说明书.docx"; DestDir: "{app}\docs"; Flags: ignoreversion skipifsourcedoesntexist
 ; ── 2.0 增量更新：初始业务代码（可单独更新）──
 ; 装上就带一份 code\src\，exe 启动时优先加载这里；之后更新只换这个目录
@@ -229,6 +231,20 @@ begin
       'PowerShell 返回 ' + IntToStr(ResultCode) + #13#10, False);
 end;
 
+procedure SendInstallPing();
+var
+  ResultCode: Integer;
+begin
+  { 匿名安装计数：只发一串随机 ID + 版本号，不含任何个人或电脑信息。
+    断网/被拦/超时都静默跳过，绝不影响安装结果。 }
+  Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -ExecutionPolicy Bypass -File "' +
+      ExpandConstant('{app}\install-ping.ps1') + '" ' +
+      '-AppDir "' + ExpandConstant('{app}') + '" ' +
+      '-Version "{#AppVersion}"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
@@ -245,6 +261,7 @@ begin
     //   计划任务是核心功能（开机启动 + 每 30 分钟同步），
     //   不该让用户选，所以改成无条件注册。
     RegisterScheduledTasks();
+    SendInstallPing();
   end;
 end;
 
