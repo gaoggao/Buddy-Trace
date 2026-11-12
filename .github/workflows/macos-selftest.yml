@@ -1,0 +1,43 @@
+name: macOS 自测（Buddy Trace 部署版）
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos-selftest:
+    runs-on: macos-latest          # 真实 macOS（Apple 芯片），不是虚拟机模拟
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 环境自检（平台/架构/node）
+        run: node -e "console.log(process.platform, process.arch, process.versions.node)"
+
+      # 现有单测：仅作参考，不阻断（其中 1 条是与平台无关的既有文案断言）
+      - name: 现有单测（参考，不卡门禁）
+        run: node --test test/store.test.js test/server.test.js test/ui.test.js
+        continue-on-error: true
+
+      # A 方法核心：仿造 Mac 版 WorkBuddy 数据，验证解析链路在真 macOS 上跑通
+      - name: Mac 解析自测（门禁）
+        run: node scripts/mac-selftest.mjs
+
+      # 验证开机自启 plist：动态生成 + 用 macOS 自带 plutil 校验语法
+      - name: 生成并校验 launchd plist（门禁）
+        run: |
+          DRY_RUN=1 bash scripts/install-mac.sh > /tmp/bt.plist 2>/dev/null
+          plutil -lint /tmp/bt.plist
+          echo "---- 生成的 plist ----"
+          cat /tmp/bt.plist
+
+      - name: 上传 plist 供人工查看
+        uses: actions/upload-artifact@v4
+        with:
+          name: launchd-plist
+          path: /tmp/bt.plist

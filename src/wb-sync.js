@@ -131,25 +131,38 @@ export function wbHome() {
   return std;
 }
 
-/** 兜底候选位置（不递归，只 stat） */
+/** 兜底候选位置（不递归，只 stat）—— 跨平台 */
 function candidateHomes() {
   const cands = [];
-  // 其他 Windows 用户目录下的 .workbuddy（多用户机器）
+  const home = os.homedir();
+  const plat = process.platform;
+
+  // 其他用户目录下的 .workbuddy（多用户机器）
+  //   Windows: C:\Users\<别的用户>\.workbuddy
+  //   macOS:   /Users/<别的用户>/.workbuddy
+  // path.dirname(homedir) 在两个平台都正好是"用户根目录"，通用。
   try {
-    const usersRoot = path.dirname(os.homedir());   // C:\Users
+    const usersRoot = path.dirname(home);
     for (const name of fs.readdirSync(usersRoot)) {
       cands.push(path.join(usersRoot, name, '.workbuddy'));
     }
   } catch { /* 读不了就算了 */ }
-  // AppData 下（有些版本会放这）
-  if (process.env.APPDATA) cands.push(path.join(process.env.APPDATA, 'WorkBuddy'));
-  if (process.env.LOCALAPPDATA) cands.push(path.join(process.env.LOCALAPPDATA, 'WorkBuddy'));
-  // 程序目录旁边的 data（便携版）
-  if (process.env.ProgramFiles) cands.push(path.join(process.env.ProgramFiles, 'WorkBuddy', 'data'));
-  // 各盘的常见位置（只查固定几个，不整盘扫）
-  for (const drv of ['C', 'D', 'E', 'F']) {
-    cands.push(drv + ':\\WorkBuddy\\data');
-    cands.push(drv + ':\\WorkBuddy');
+
+  if (plat === 'darwin') {
+    // macOS 专有兜底（探测发现真机上也存在这些位置）
+    cands.push(path.join(home, 'Library', 'Application Support', 'WorkBuddy'));
+    cands.push(path.join(home, 'Library', 'Application Support', 'Buddy'));
+    cands.push(path.join(home, '.codebuddy'));
+  } else {
+    // Windows 专有
+    if (process.env.APPDATA) cands.push(path.join(process.env.APPDATA, 'WorkBuddy'));
+    if (process.env.LOCALAPPDATA) cands.push(path.join(process.env.LOCALAPPDATA, 'WorkBuddy'));
+    if (process.env.ProgramFiles) cands.push(path.join(process.env.ProgramFiles, 'WorkBuddy', 'data'));
+    // 各盘的常见位置（只查固定几个，不整盘扫）
+    for (const drv of ['C', 'D', 'E', 'F']) {
+      cands.push(drv + ':\\WorkBuddy\\data');
+      cands.push(drv + ':\\WorkBuddy');
+    }
   }
   return cands;
 }
