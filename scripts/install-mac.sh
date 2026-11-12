@@ -14,7 +14,8 @@
 # ─────────────────────────────────────────────────────────
 set -u
 
-REPO_URL="https://github.com/gaoggao/Buddy-Trace.git"
+REPO_GITEE="https://gitee.com/gaogao2013/Buddy-Trace.git"
+REPO_GITHUB="https://github.com/gaoggao/Buddy-Trace.git"
 LABEL="com.lbase.buddytrace"
 
 # ── 0. 找 node（不写死路径：Homebrew/官方pkg/nvm 都能找到）──
@@ -77,14 +78,24 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
   exit 0
 fi
 
-# ── 3. 下载代码 ──
+# ── 3. 下载代码（优先 Gitee，国内不用梯子；失败回退 GitHub）──
 echo "→ 安装到: $INSTALL_DIR"
 if [ -d "$INSTALL_DIR/.git" ]; then
   echo "→ 已存在，执行更新 (git pull)"
   git -C "$INSTALL_DIR" pull --ff-only 2>&1 | tail -2
 else
   mkdir -p "$(dirname "$INSTALL_DIR")"
-  git clone --depth 1 "$REPO_URL" "$INSTALL_DIR" 2>&1 | tail -2
+  echo "→ 从 Gitee 下载..."
+  if git clone --depth 1 "$REPO_GITEE" "$INSTALL_DIR" 2>&1 | tail -2; then :; fi
+  if [ ! -d "$INSTALL_DIR/src" ]; then
+    echo "→ Gitee 没成功，回退 GitHub..."
+    rm -rf "$INSTALL_DIR"
+    git clone --depth 1 "$REPO_GITHUB" "$INSTALL_DIR" 2>&1 | tail -2
+  fi
+fi
+if [ ! -d "$INSTALL_DIR/src" ]; then
+  echo "❌ 下载失败（Gitee 和 GitHub 都没连上）。检查网络后重试。"
+  exit 1
 fi
 mkdir -p "$DATA_DIR"
 
