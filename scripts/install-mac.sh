@@ -120,6 +120,24 @@ PORT="${PORT:-41829}"
 echo "✅ 已启动。界面地址： http://127.0.0.1:$PORT"
 open "http://127.0.0.1:$PORT" 2>/dev/null || echo "   请手动在浏览器打开 http://127.0.0.1:$PORT"
 
+# ── 6. 匿名安装计数（一次；重装/更新用同一个 ID，不重复计）──
+#    只发一串随机 ID + 版本 + "mac"，不含 IP/电脑名/账号/任何 WorkBuddy 内容。
+#    断网/超时静默跳过，绝不影响安装。
+INSTALL_ID_FILE="$HOME/.buddytrace-install-id"
+if [ ! -s "$INSTALL_ID_FILE" ]; then
+  NEWID="$(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid 2>/dev/null || echo "mac-$(date +%s)-$$")"
+  echo "$NEWID" > "$INSTALL_ID_FILE" 2>/dev/null || true
+fi
+INSTALL_ID="$(cat "$INSTALL_ID_FILE" 2>/dev/null)"
+# 版本号从仓库里读（不写死）
+BT_VER="$(grep -oE "VERSION = '[^']+'" "$INSTALL_DIR/src/version.js" 2>/dev/null | grep -oE "[0-9][^']*" | head -1)"
+BT_VER="${BT_VER:-unknown}"
+if [ -n "$INSTALL_ID" ]; then
+  curl -s -m 8 -X POST -H 'Content-Type: application/json' \
+    -d "{\"id\":\"$INSTALL_ID\",\"v\":\"$BT_VER\",\"os\":\"mac\"}" \
+    "https://buddy-trace.lbase.com/admin/api/install-ping" >/dev/null 2>&1 || true
+fi
+
 echo ""
 echo "完成 ✅  以后开机自动运行，每 30 分钟自动备份 WorkBuddy 记忆。"
 echo "卸载： bash \"$INSTALL_DIR/scripts/uninstall-mac.sh\""
