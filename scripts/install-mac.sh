@@ -33,7 +33,7 @@ if [ "$NODE_MAJOR" -lt 22 ]; then
   echo "   读 WorkBuddy 数据要用 Node 22+ 内置的 sqlite，请升级 Node。"
   exit 1
 fi
-echo "✅ Node: $NODE_BIN  ($("$NODE_BIN" -v))"
+echo "✅ Node: $NODE_BIN  ($("$NODE_BIN" -v))" >&2
 
 # ── 1. 安装目录（默认 ~/BuddyTrace，可用 BT_INSTALL_DIR 覆盖）──
 INSTALL_DIR="${BT_INSTALL_DIR:-$HOME/BuddyTrace}"
