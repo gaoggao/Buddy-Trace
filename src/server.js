@@ -388,13 +388,31 @@ export function createServer(store, opts = {}) {
         });
         const kept = filterByUid(result.items || [], who.uid, groupMatesOf(wbDataDir, who.uid, allUidsFor(who.uid)));
         const want = Number(body.limit || url.searchParams.get('limit') || 20);
-        return sendJson(res, 200, {
+
+        // 自我描述：搜到 0 条时，必须能分清"真没有"和"你没指定账号"
+        const accounts = store.listAccounts();
+        const scoped = !!who.uid;
+        const matchedAll = (result.items || []).length;   // 按 uid 过滤前（全库命中）
+        const payload = {
           ok: true,
           query: q,
           total: kept.length,
           items: kept.slice(0, want),
           uid: who.uid,
-        });
+          scoped,
+          matchedAll,                    // 全库命中条数
+          shown: kept.length,            // 本次可见命中条数
+          accounts,
+        };
+        if (!scoped) {
+          const others = Math.max(0, matchedAll - kept.length);
+          payload.notice = `未指定 uid：只在"全局内容"里搜，命中 ${kept.length} 条。`
+            + (others > 0
+              ? `另有 ${others} 条命中属于其他账号（全库命中 ${matchedAll} 条），你没看到。`
+              : `全库命中 ${matchedAll} 条，其中没有属于其他账号的。`)
+            + `要搜全部：加 ?uid=*；要搜某个账号：加 ?uid=<uid>（用 accounts[].uid，不要用昵称）。`;
+        }
+        return sendJson(res, 200, payload);
       }
 
       // ── 取内容（统一入口：get） ──
@@ -416,8 +434,15 @@ export function createServer(store, opts = {}) {
 
         const who = resolveUid(url);
         const owner = String(item.uid || '').trim();
-        if (owner && !owner.split(',').map((s) => s.trim()).includes(who.uid)) {
-          return sendJson(res, 403, { ok: false, error: '这条记录不属于当前账号' });
+        const owners = owner ? owner.split(',').map((s) => s.trim()).filter(Boolean) : [];
+        // 例外：显式 ?uid=* 表示"查这台机器上所有账号"，不按归属拦
+        if (owners.length && who.uid !== '*' && !owners.includes(who.uid)) {
+          return sendJson(res, 403, {
+            ok: false,
+            error: '这条记录不属于当前账号',
+            ownerUid: owners.join(','),
+            hint: '用 ?uid=<ownerUid> 重试；要一次查全部账号用 ?uid=*。',
+          });
         }
 
         // 隐私库：人看的时候不给正文（agent 带 body=1 才给）
@@ -474,14 +499,32 @@ export function createServer(store, opts = {}) {
 
         const limit = Number(url.searchParams.get('limit') || 50);
         const offset = Number(url.searchParams.get('offset') || 0);
-        return sendJson(res, 200, {
+
+        // ③ 自我描述（老板 2026-11-13）：
+        //   不带 uid 时只给全局内容，但【必须告诉调用方"你只看到了一部分"】。
+        //   为什么：之前是静默残缺 —— agent 看到 5 条就断言"库里没有这个项目"，
+        //   实际全库 94 条属于多个账号。残缺不可怕，静默残缺才致命。
+        const accounts = store.listAccounts();
+        const scoped = !!who.uid;
+        const payload = {
           ok: true,
           total: items.length,
           items: items.slice(offset, offset + limit),
           counts,          // 各库条数（含隐私库）—— 界面显示"已存多少条"
           uid: who.uid,
           uidFrom: who.from,
-        });
+          scoped,                       // false = 你没指定账号，看到的只是一部分
+          shown: items.length,          // 本次可见条数（账号过滤后）
+          totalAll: result.total,       // 全库条数（不按账号过滤）
+          accounts,                     // [{uid, account, total}] 机器可直接用
+        };
+        if (!scoped) {
+          payload.notice = `未指定 uid：只返回了全局内容（${items.length} 条）。`
+            + `本库共 ${result.total} 条，分属 ${accounts.length} 个账号。`
+            + `要查全部账号：加 ?uid=*；要查某个账号：加 ?uid=<uid>`
+            + `（uid 用 accounts[].uid，不要用昵称）。`;
+        }
+        return sendJson(res, 200, payload);
       }
 
       // ── WorkBuddy 账号清单 ──

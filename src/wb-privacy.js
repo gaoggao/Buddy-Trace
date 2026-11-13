@@ -120,15 +120,20 @@ export function currentLoginUid() {
  *
  * 所以：
  *   · 带了 uid → 是 agent 调用，按这个 uid 取数据
+ *   · 带了 *   → 显式"查全部账号"（老板 2026-11-13 加：
+ *                 agent 不知道 uid 时不能只给个残缺结果还不吭声）
  *   · 没带 uid → 不是合法调用。一律当"无身份"，只给全局内容（技能），
  *                不回退到"当前登录账号" —— 否则浏览器直接打开就等于冒用登录者身份。
  *
  * @param {URL} url
- * @returns {{uid: string, from: 'agent'|'none'}}
+ * @returns {{uid: string, from: 'agent'|'all'|'none'}}
  */
 export function resolveUid(url) {
   const q = url.searchParams.get('uid');
-  if (q && q.trim()) return { uid: q.trim(), from: 'agent' };
+  if (q && q.trim()) {
+    const v = q.trim();
+    return { uid: v, from: v === '*' ? 'all' : 'agent' };
+  }
   return { uid: '', from: 'none' };
 }
 
@@ -140,9 +145,15 @@ export function resolveUid(url) {
  * @param {Array<string>} [groupUids] 同组的其他 uid（老板主动合并的账号）
  */
 export function filterByUid(items, uid, groupUids) {
+  const self = String(uid || '').trim();
+
+  // 显式全量：agent 用 ?uid=* 要求"这台机器上所有账号的记录都给我"
+  // （正文仍受 canViewContent / body=1 限制，这里只是不过滤归属）
+  if (self === '*') return items.slice();
+
   // 把「自己 + 同组」合成一个集合
   const allowed = new Set();
-  if (uid) allowed.add(uid);
+  if (self) allowed.add(self);
   for (const g of (groupUids || [])) {
     if (g) allowed.add(g);
   }

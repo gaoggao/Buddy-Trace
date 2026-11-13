@@ -263,8 +263,26 @@ function markdownZh(base, rules) {
 
 连着本地记忆库 ${base}。
 
-每次会话开始，先查最近做了什么：
-\`curl.exe "${base}/api/list?limit=20"\`
+每次会话开始，先查最近做了什么（**三步，别跳过第一步**）：
+
+\`\`\`
+# ① 这台机器上有哪些 WorkBuddy 账号（uid + 各自条数）
+curl.exe "${base}/api/accounts"
+
+# ② 查全部账号的记录（推荐；不用猜 uid）
+curl.exe "${base}/api/list?uid=*&limit=20"
+
+# ③ 只查某一个账号（uid 用 ① 里的 uid）
+curl.exe "${base}/api/list?uid=<uid>&limit=20"
+\`\`\`
+
+**⚠ 不带 uid 的 \`/api/list\` 只会返回"全局内容"（技能这类），并在响应里给 \`notice\`。
+绝不能拿这个结果断言"库里没有这个项目"——那只是你没查全。**
+uid 必须用 \`/api/accounts\` 里的 \`uid\` 字段，**不能用账号昵称。**
+
+搜索同理：\`/api/search\` 也要带 \`uid\`（或 \`?uid=*\` 搜全部账号）。
+返回里有 \`scoped\` / \`shown\` / \`matchedAll\` / \`notice\` 四个字段：
+\`scoped=false\` 就说明你只看到了一部分，必须换 \`uid=*\` 或指定 uid 重查。
 
 每次任务结束、或做出重要变更时，把这次产生的写进对应库（一条一写，别合并）：
 - 技能 → kind=skill
@@ -512,8 +530,14 @@ Claude Code 支持在特定时机自动执行命令并注入内容。
 在开始任何任务之前：
 
 \`\`\`bash
-curl.exe "${base}/api/list?limit=20"
+# ① 先看有哪些 WorkBuddy 账号（uid + 条数）
+curl.exe "${base}/api/accounts"
+
+# ② 查全部账号的记录（推荐，不用猜 uid）
+curl.exe "${base}/api/list?uid=*&limit=20"
 \`\`\`
+**⚠ 不带 uid 的 \`/api/list\` 只返回全局内容（技能这类），响应里会给 \`notice\`。
+看到 \`scoped=false\` 或 \`notice\`，就说明你没查全——绝不能据此断言"库里没有"。**
 **⚠ 为什么写 \`curl.exe\` 而不是 \`curl\`：**
 PowerShell 里 \`curl\` 是 \`Invoke-WebRequest\` 的**别名**，参数语法完全不同。
 写 \`curl.exe\` 才会调用真正的 curl（Windows 自带）。
@@ -636,13 +660,13 @@ curl.exe "${base}/api/session?session_id=你传的ID"
 curl.exe "${base}/api/sessions"
 
 # 按 agent 列出（某个 agent 写过什么）
-curl.exe "${base}/api/list?agent=你的名字"
+curl.exe "${base}/api/list?uid=*&agent=你的名字"
 
 # 按项目列出
-curl.exe "${base}/api/list?project=归流"
+curl.exe "${base}/api/list?uid=*&project=归流"
 
 # 按会话列出
-curl.exe "${base}/api/list?session=你传的ID"
+curl.exe "${base}/api/list?uid=*&session=你传的ID"
 \`\`\`
 
 **这些都是给你（agent）查的，不用管用户看不看得懂。**
@@ -759,14 +783,14 @@ curl.exe -X POST ${base}/api/write \\
 
 \`\`\`bash
 # 搜索
-curl.exe -X POST ${base}/api/search -H "Content-Type: application/json" -d '{"q":"关键词"}'
+curl.exe -X POST ${base}/api/search -H "Content-Type: application/json" -d '{"q":"关键词","uid":"*"}'
 
 # 取全文
 curl.exe "${base}/api/get?id=<id>"
 
 # 列项目 / 列某库
 curl.exe "${base}/api/projects"
-curl.exe "${base}/api/list?kind=skill&limit=50"
+curl.exe "${base}/api/list?uid=*&kind=skill&limit=50"
 \`\`\`
 
 ## 3.8 用户设置的规则
@@ -1003,8 +1027,24 @@ and tends to conflict with the project's own rules.
 
 Connected to a local memory base at ${base}.
 
-At the start of every session, check what was done recently:
-\`curl.exe "${base}/api/list?limit=20"\`
+At the start of every session, check what was done recently (**three steps, do not skip step 1**):
+
+\`\`\`
+# 1) which WorkBuddy accounts exist on this machine (uid + item counts)
+curl.exe "${base}/api/accounts"
+
+# 2) all accounts at once (recommended; no need to guess uid)
+curl.exe "${base}/api/list?uid=*&limit=20"
+
+# 3) a single account (use the uid from step 1)
+curl.exe "${base}/api/list?uid=<uid>&limit=20"
+\`\`\`
+
+**WARNING: \`/api/list\` without \`uid\` returns only global items (skills etc.) and adds a \`notice\` to the response.
+Never conclude "the base has nothing about this project" from that result — you simply did not look everywhere.
+Always use the \`uid\` field from \`/api/accounts\`; never pass an account nickname as uid.**
+Same for \`/api/search\`: pass \`uid\` (or \`?uid=*\`).
+Check \`scoped\` / \`shown\` / \`matchedAll\` / \`notice\` in the response: \`scoped=false\` means partial results — requery with \`uid=*\`.
 
 When a task ends, or you make an important change, record what it produced (one item per write, do not merge):
 - Skills → kind=skill
@@ -1251,8 +1291,16 @@ and had to write both versions to compensate.)
 ## 3.1 At the start of every session, check the base
 
 \`\`\`bash
-curl.exe "${base}/api/list?limit=20"
+# 1) which accounts exist here (uid + counts)
+curl.exe "${base}/api/accounts"
+
+# 2) all accounts (recommended)
+curl.exe "${base}/api/list?uid=*&limit=20"
 \`\`\`
+
+**⚠ \`/api/list\` without \`uid\` returns only global items and includes a \`notice\`.
+\`scoped=false\` means you saw a fraction — never claim "not in the base" from that.
+Use the \`uid\` field from \`/api/accounts\`, not a nickname.**
 
 **⚠ Why \`curl.exe\` and not \`curl\`:** in PowerShell \`curl\` is an
 **alias for \`Invoke-WebRequest\`** with completely different argument syntax.
@@ -1374,13 +1422,13 @@ curl.exe "${base}/api/session?session_id=the-id-you-sent"
 curl.exe "${base}/api/sessions"
 
 # Everything written by one agent
-curl.exe "${base}/api/list?agent=your-name"
+curl.exe "${base}/api/list?uid=*&agent=your-name"
 
 # Everything under one project
-curl.exe "${base}/api/list?project=my-project"
+curl.exe "${base}/api/list?uid=*&project=my-project"
 
 # Everything under one session
-curl.exe "${base}/api/list?session=the-id-you-sent"
+curl.exe "${base}/api/list?uid=*&session=the-id-you-sent"
 \`\`\`
 
 **These are for you (the agent) to query. Do not worry about whether the user can read them.**
@@ -1495,10 +1543,10 @@ curl.exe -X POST ${base}/api/write \\
 ## 3.7 Query API
 
 \`\`\`bash
-curl.exe -X POST ${base}/api/search -H "Content-Type: application/json" -d '{"q":"keyword"}'
+curl.exe -X POST ${base}/api/search -H "Content-Type: application/json" -d '{"q":"keyword","uid":"*"}'
 curl.exe "${base}/api/get?id=<id>"
 curl.exe "${base}/api/projects"
-curl.exe "${base}/api/list?kind=skill&limit=50"
+curl.exe "${base}/api/list?uid=*&kind=skill&limit=50"
 \`\`\`
 
 ## 3.8 Rules set by the user
