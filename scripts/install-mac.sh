@@ -8,9 +8,17 @@
 #   · 断网/没装 node 会给明确提示，不静默失败
 #
 # 用法：
-#   bash install-mac.sh
+#   推荐引导（国内免梯子，重复安装/更新都用这一条）：
+#     curl -fsSL "https://gitee.com/gaogao2013/Buddy-Trace/raw/master/scripts/install-mac.sh" -o /tmp/bt-install.sh && bash /tmp/bt-install.sh
+#   本地执行：
+#     bash install-mac.sh
 #   BT_INSTALL_DIR=/some/path bash install-mac.sh   # 自定义安装位置
 #   DRY_RUN=1 bash install-mac.sh                   # 只打印将生成的 plist，不真装（测试用）
+#
+# 行为保证：
+#   · 重复安装不会报"目录已存在"——已存在就走更新，更新不通就从 Gitee 重拉
+#   · 换文件前先备份用户数据（~/.buddytrace-data-backup），失败也能自动恢复
+#   · 全程 Gitee 优先，GitHub 只做兜底
 # ─────────────────────────────────────────────────────────
 set -u
 
@@ -78,23 +86,49 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
   exit 0
 fi
 
-# ── 3. 下载代码（优先 Gitee，国内不用梯子；失败回退 GitHub）──
-echo "→ 安装到: $INSTALL_DIR"
+# ── 3. 获取/更新代码（全程不丢用户数据；Gitee 优先，GitHub 兜底）──
+echo "→ 安装目录: $INSTALL_DIR"
+DATA_BAK="$HOME/.buddytrace-data-backup"     # 数据应急备份位（固定路径，断网/重装都不丢）
+
+# 上次安装失败留下的备份 → 自动恢复
+if [ -d "$DATA_BAK" ] && [ ! -d "$DATA_DIR" ]; then
+  mkdir -p "$(dirname "$INSTALL_DIR")"
+  mv "$DATA_BAK" "$DATA_DIR"
+  echo "✅ 检测到上次安装留下的数据备份，已自动恢复"
+fi
+
 if [ -d "$INSTALL_DIR/.git" ]; then
-  echo "→ 已存在，执行更新 (git pull)"
-  git -C "$INSTALL_DIR" pull --ff-only 2>&1 | tail -2
+  echo "→ 已存在，尝试更新 (git pull)"
+  if git -C "$INSTALL_DIR" pull --ff-only >/dev/null 2>&1; then
+    echo "✅ 已更新到最新"
+  else
+    # pull 失败多半是旧仓库 origin 指向 GitHub、当前网络连不上
+    echo "→ git pull 不通，改从 Gitee 重新获取（你的数据会先备份，不会丢）"
+    launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true   # 先停服务，避免换文件时反复重启
+    [ -d "$DATA_DIR" ] && mv "$DATA_DIR" "$DATA_BAK"
+    rm -rf "$INSTALL_DIR"
+    if ! git clone --depth 1 "$REPO_GITEE" "$INSTALL_DIR" >/dev/null 2>&1; then
+      echo "❌ 从 Gitee 重新获取也没成功。请检查网络后重跑本脚本。"
+      echo "   你的记忆库数据已备份在: $DATA_BAK —— 网络恢复后重跑本脚本会自动恢复。"
+      exit 1
+    fi
+    mkdir -p "$INSTALL_DIR"
+    [ -d "$DATA_BAK" ] && mv "$DATA_BAK" "$DATA_DIR"
+    echo "✅ 已从 Gitee 重新获取，原数据已恢复"
+  fi
 else
+  # 全新安装：Gitee 优先，GitHub 兜底
   mkdir -p "$(dirname "$INSTALL_DIR")"
   echo "→ 从 Gitee 下载..."
-  if git clone --depth 1 "$REPO_GITEE" "$INSTALL_DIR" 2>&1 | tail -2; then :; fi
+  git clone --depth 1 "$REPO_GITEE" "$INSTALL_DIR" >/dev/null 2>&1 || true
   if [ ! -d "$INSTALL_DIR/src" ]; then
     echo "→ Gitee 没成功，回退 GitHub..."
     rm -rf "$INSTALL_DIR"
-    git clone --depth 1 "$REPO_GITHUB" "$INSTALL_DIR" 2>&1 | tail -2
+    git clone --depth 1 "$REPO_GITHUB" "$INSTALL_DIR" >/dev/null 2>&1 || true
   fi
 fi
 if [ ! -d "$INSTALL_DIR/src" ]; then
-  echo "❌ 下载失败（Gitee 和 GitHub 都没连上）。检查网络后重试。"
+  echo "❌ 下载失败（Gitee 和 GitHub 都没连上）。检查网络后重跑本脚本。"
   exit 1
 fi
 mkdir -p "$DATA_DIR"
