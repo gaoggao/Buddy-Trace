@@ -192,9 +192,38 @@ export async function applyUpdate(dataDir, cfg = null) {
     return { ok: false, error: '解压失败，已回滚: ' + e.message };
   }
 
-  // ⑤ 成功，删备份
-  try { fs.rmSync(bakDir, { recursive: true, force: true }); } catch { /* 忽略 */ }
+  // ⑤ 写"启动待确认"标记（2.1.9）
+  //
+  // 为什么：解压成功 ≠ 新代码能跑起来。老代码在解压后立刻删掉 code.bak，
+  // 一旦新版本启动就崩，就没有可回滚的东西了。
+  // 现在留着 code.bak 和这个标记，等新进程"启动成功"时由 confirmBoot() 清理；
+  // 如果它一直没被清（新版本起不来），下次启动时 shell.js 会自动回滚。
+  try {
+    fs.writeFileSync(
+      path.join(exeDir, 'boot-pending.json'),
+      JSON.stringify({ at: Date.now(), version: cfg.version, from: LOCAL_VERSION_HINT() }),
+    );
+  } catch { /* 标记写不了不影响更新本身 */ }
+
+  // ⑥ 成功：**保留** code.bak，交给 confirmBoot() 在新版本启动成功后删
   return { ok: true, version: cfg.version };
+}
+
+/** 本机当前版本（只用于在 boot-pending 里留痕，失败不影响流程） */
+function LOCAL_VERSION_HINT() {
+  try {
+    return process.env.BT_VERSION || '';
+  } catch { return ''; }
+}
+
+/**
+ * 启动成功确认（2.1.9）：清掉 boot-pending 标记，并删掉更新时的 code.bak。
+ *
+ * 只在"服务真的起来并开始监听"之后调用 —— 这就是"这次更新没问题"的证据。
+ */
+export function confirmBoot(exeDir = path.dirname(process.execPath)) {
+  try { fs.rmSync(path.join(exeDir, 'boot-pending.json'), { force: true }); } catch { /* 忽略 */ }
+  try { fs.rmSync(path.join(exeDir, 'code.bak'), { recursive: true, force: true }); } catch { /* 忽略 */ }
 }
 
 /** 回滚到上一版：code.bak → code */

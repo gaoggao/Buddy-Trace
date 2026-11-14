@@ -755,9 +755,16 @@ export function createServer(store, opts = {}) {
       if (route === 'GET /api/update-apply' || route === 'POST /api/update-apply') {
         const r = await applyUpdate(wbDataDir);
         // 更新成功 → 安排重启，让新代码立即生效
-        // 注意：先返回响应，再延迟重启（scheduleRestart 里 setTimeout 1200ms，
-        //       足够 sendJson 把响应写完）
-        if (r.ok) scheduleRestart();
+        // 2.1.9 改：重启前先把自己关掉（释放端口），否则新进程绑不上同一个端口，
+        //           会顺延到备用端口，runtime.json 跟着漂移，用户点图标就是死链。
+        if (r.ok) {
+          scheduleRestart(800, {
+            dataDir: wbDataDir,
+            closeServer: () => (typeof server.__closeForRestart === 'function'
+              ? server.__closeForRestart()
+              : Promise.resolve()),
+          });
+        }
         return sendJson(res, 200, { ok: r.ok, error: r.error || null, version: r.version || null });
       }
 

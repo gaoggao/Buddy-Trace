@@ -19,7 +19,7 @@
 
 #define AppName        "溯源 · Buddy Trace"
 #define AppNameEn      "Buddy Trace"
-#define AppVersion     "2.1.8"
+#define AppVersion     "2.1.9"
 #define AppPublisher   "Buddy Trace"
 #define AppURL         "https://github.com/gaoggao/Buddy-Trace"
 #define AppExeName     "BuddyTrace.exe"

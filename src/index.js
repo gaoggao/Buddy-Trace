@@ -17,7 +17,7 @@ import { Store } from './store.js';
 import { Config } from './config.js';
 import { createServer, listenWithFallback } from './server.js';
 import { resolvePorts } from './ports.js';
-import { readRuntime, writeRuntime, existingInstance } from './runtime.js';
+import { readRuntime, writeRuntime, existingInstance, isPidAlive, readLock, acquireLock, releaseLock, updateLockPort, reportFatal } from './runtime.js';
 
 const args = parseArgs(process.argv.slice(2));
 
@@ -78,19 +78,52 @@ try {
   process.exit(1);
 }
 
-// ── 单实例检查（2026-11-08 加）──
-// 双击两次图标 / 计划任务与服务同时启动，都会造成两个实例各写各的库。
-// 这里读 runtime.json，发现已有一个活着的实例，就不再起第二个。
+// ── 单实例（2026-11-14 换成真锁，2.1.9）──
 //
-// 注意：必须在 new Store() 之前查 —— Store 构造器会打开索引文件，
-// 如果第二个实例先打开 Store 再退出，极端情况下会和第一个实例并发写 index.json。
-const alreadyPort = await existingInstance(dataDir);
-if (alreadyPort) {
-  console.log(`  已有实例在跑（端口 ${alreadyPort}），本进程退出`);
-  // 用户双击图标（没带 --no-open）→ 打开浏览器到已有实例，方便用户看到
-  if (!args['no-open']) {
-    openBrowser(`http://127.0.0.1:${alreadyPort}`);
+// 老做法只靠"探活端口"，踩过的坑（老板实测）：
+//   增量更新后重启，新进程探活打到【还没退干净】的旧进程 → 判定"已有实例" → 自己退出，
+//   结果新旧全没了、服务真空；用户再点图标就变成几个进程抢端口。
+//
+// 现在三件事：
+//   ① 实例锁 instance.lock：原子创建 + PID 存活校验，重复启动直接挡掉
+//   ② --restart（更新后由旧进程拉起）：跳过这道检查，否则一定被挡住
+//   ③ 探活作为兜底：兼容没有锁的旧版本实例
+if (!args.restart) {
+  const lk = readLock(dataDir);
+  if (lk && isPidAlive(lk.pid)) {
+    console.log(`  已有实例在跑（PID ${lk.pid}，端口 ${lk.port || '?'}），本进程退出`);
+    if (!args['no-open'] && lk.port) openBrowser(`http://127.0.0.1:${lk.port}`);
+    process.exit(0);
   }
+  // 显式指定 --port 时不再扫默认端口：那是"找本机其他实例"的兜底手段，
+  // 会让另一个数据目录上的实例被误判成"自己人"（2.1.9 修）
+  const alreadyPort = await existingInstance(dataDir, { scanPorts: !args.port });
+  if (alreadyPort) {
+    console.log(`  已有实例在跑（端口 ${alreadyPort}），本进程退出`);
+    if (!args['no-open']) openBrowser(`http://127.0.0.1:${alreadyPort}`);
+    process.exit(0);
+  }
+}
+
+let lockRes;
+if (args.restart) {
+  // 更新后重启（2.1.9）：锁还在"正在退出的旧进程"手里，要等它彻底放手再接管。
+  // 否则新进程一看"锁被占"就退出，又变成新旧都没了。
+  const deadline = Date.now() + 15000;
+  for (;;) {
+    lockRes = acquireLock(dataDir, { pid: process.pid });
+    if (lockRes.ok) break;
+    const h = lockRes.holder || {};
+    if (!isPidAlive(h.pid) || Date.now() > deadline) break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+} else {
+  lockRes = acquireLock(dataDir, { pid: process.pid });
+}
+if (!lockRes.ok) {
+  const h = lockRes.holder || {};
+  console.log(`  已有实例在跑（PID ${h.pid || '?'}，端口 ${h.port || '?'}），本进程退出`);
+  if (!args['no-open'] && h.port) openBrowser(`http://127.0.0.1:${h.port}`);
   process.exit(0);
 }
 
@@ -109,17 +142,55 @@ console.log(`  已有内容: ${stats.total} 条，项目: ${stats.projects} 个`
 let actualPort = 0;
 const server = createServer(store, { config, dataDir, getPort: () => actualPort });
 
+/** 更新后重启用：先把自己关掉（立刻释放端口），再让新进程接管 */
+const closeForRestart = () => new Promise((resolve) => {
+  try {
+    if (syncer) syncer.stop();
+  } catch { /* 忽略 */ }
+  try { server.closeAllConnections?.(); } catch { /* 忽略 */ }
+  let done = false;
+  const finish = () => { if (!done) { done = true; resolve(); } };
+  try { server.close(finish); } catch { finish(); }
+  setTimeout(finish, 800);   // 兜底：800ms 内没关干净也放行
+});
+server.__closeForRestart = closeForRestart;
+
 try {
-  actualPort = await listenWithFallback(server, ports);
+  if (args.restart) {
+    // 更新后重启（2.1.9）：旧进程放手的瞬间端口可能还有几十毫秒没释放，
+    // 直接绑不上一路顺延到备用端口，就又是"端口漂移"。
+    // 这里给 12 秒窗口，反复重试整张端口表。
+    const deadline = Date.now() + 12000;
+    for (;;) {
+      try {
+        actualPort = await listenWithFallback(server, ports);
+        break;
+      } catch (e) {
+        if (Date.now() > deadline) throw e;
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    }
+  } else {
+    actualPort = await listenWithFallback(server, ports);
+  }
 } catch (err) {
   console.error(`  ✗ ${err.message}`);
   console.error('  请关闭占用这些端口的程序，或用 --port 指定其它端口');
+  // 2.1.9：不再让用户对着一片空白，给一个看得见的说明页 + 自动修复脚本
+  releaseLock(dataDir);
+  const page = reportFatal({
+    exeDir: path.dirname(process.execPath),
+    dataDir,
+    reason: `端口都被占用，起不来（${err.message}）`,
+  });
+  if (page && !args['no-open']) openBrowser(`file://${page.replace(/\\/g, '/')}`);
   store.close();
   process.exit(1);
 }
 
 // 记录实际端口，供 watchdog / 导出链接等外部组件读取（不写死）
 writeRuntime(dataDir, { port: actualPort, pid: process.pid });
+updateLockPort(dataDir, actualPort);
 
 // ── WorkBuddy 自动同步（全自动，用户不点任何按钮）──
 // 启动扫一次 + 之后每 30 分钟扫一次（BT_INTERVAL 可改）
@@ -145,6 +216,18 @@ const base = `http://127.0.0.1:${actualPort}`;
 console.log(`  ✓ 服务已启动`);
 console.log(`    界面: ${base}`);
 console.log(`    接口: ${base}/api/health`);
+
+// ── 启动成功 = 这次更新没问题（2.1.9）──
+// 清掉 boot-pending 标记、删掉 code.bak 备份。
+// 反过来：如果新版本起不来，标记会留着；下次启动时 shell.js 看到它就知道该回滚。
+// 只在打包版（exe）下做——开发模式 execPath 是 node.exe，别去动 node 的安装目录。
+try {
+  const execName = path.basename(process.execPath).toLowerCase();
+  if (execName.endsWith('.exe') && execName !== 'node.exe') {
+    const { confirmBoot } = await import('./updater.js');
+    confirmBoot(path.dirname(process.execPath));
+  }
+} catch { /* 忽略 */ }
 if (syncer) {
   console.log(`    WorkBuddy 同步: 已启用（每 ${syncer.status().intervalMinutes} 分钟一次）`);
 }
@@ -170,16 +253,18 @@ if (!args['no-open']) {
   })();
 }
 
-// 优雅退出
+// 优雅退出（2.1.9：退出时必须放锁，否则下次启动会被残留锁挡住）
+process.on('exit', () => { try { releaseLock(dataDir); } catch { /* 忽略 */ } });
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
     console.log('\n正在停止…');
     if (syncer) syncer.stop();
     server.close(() => {
+      releaseLock(dataDir);
       store.close();
       process.exit(0);
     });
-    setTimeout(() => process.exit(0), 2000);
+    setTimeout(() => { releaseLock(dataDir); process.exit(0); }, 2000);
   });
 }
 

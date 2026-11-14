@@ -1,1 +1,1 @@
-{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "2.1.8", "code": "code-2.1.8.tar.gz", "sha256": "e19b8313530ef8b14167e634c2e16d611b283a0b2a42cfe1c8b8da0a482b49b8", "notes": "2.1.8：新增 Mac 版对外安装说明；agent 规则补充本机写法（macOS 的 curl / 路径写法）"}
+{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "2.1.9", "code": "code-2.1.9.tar.gz", "sha256": "73910a7cc94eb3064fcf8e2aec816d5fde4ca162a33f93e30468b5afc6a0a60c", "notes": "2.1.9：修复更新后服务消失（重启握手/实例锁/失败自动回滚/起不来给说明页）"}
