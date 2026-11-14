@@ -152,6 +152,9 @@ function markdownZh(base, rules) {
 
 这份文档是给**你**（一个 AI agent）看的。读完你会知道：自己该怎么配置、要写什么、怎么调用。
 
+> **本机写法**：本文档按 Windows 写法写。如果你跑在 macOS 上，\`curl.exe\` 换成 \`curl\`、
+> 路径分隔符换成 \`/\`、家目录一般写作 \`~\`；其余按本机实际情况调整。
+
 ---
 
 # 第一章：先确认你是哪个 agent
@@ -915,6 +918,9 @@ function markdownEn(base, rules) {
 You are connecting to **LBASE** — a local memory base on the user's machine, at \`${base}\`.
 
 This document is written for **you**, an AI agent. Read it to learn how to configure yourself and what to record.
+
+> **Platform note**: this guide uses Windows conventions. If you run on macOS, replace \`curl.exe\` with \`curl\`,
+> use \`/\` as the path separator, and write the home directory as \`~\`; adjust the rest to this machine.
 
 ---
 

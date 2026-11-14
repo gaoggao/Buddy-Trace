@@ -1,1 +1,1 @@
-{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "2.1.7", "code": "code-2.1.7.tar.gz", "sha256": "e97c0f749c9330fddd00a49411f4bb174f7a61fc09d2fc8bcbe4b87efdbc33a4", "notes": "2.1.7：修复记忆库查询误判（响应自述残缺 + uid=* 全量 + 403 可自愈），agent 规则改为三步查库；新增 Mac 部署版"}
+{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "2.1.8", "code": "code-2.1.8.tar.gz", "sha256": "e19b8313530ef8b14167e634c2e16d611b283a0b2a42cfe1c8b8da0a482b49b8", "notes": "2.1.8：新增 Mac 版对外安装说明；agent 规则补充本机写法（macOS 的 curl / 路径写法）"}
