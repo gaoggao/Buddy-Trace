@@ -88,7 +88,7 @@ export async function checkUpdate(dataDir) {
 
   const cfg = await fetchRemoteConfig();
   if (!cfg || !cfg.version) {
-    return { hasUpdate: false, remoteVersion: null, localVersion: VERSION, notes: '', cfg: null };
+    return { hasUpdate: false, remoteVersion: null, localVersion: VERSION, notes: '', cfg: null, manualOnly: !isPackaged() };
   }
   const remoteVersion = String(cfg.version);
   const hasUpdate = compareVersion(remoteVersion, VERSION) > 0;
@@ -98,6 +98,11 @@ export async function checkUpdate(dataDir) {
     localVersion: VERSION,
     notes: cfg.notes || '',
     cfg,
+    // 3.0.3：非安装版（Mac / Linux 部署版）没有 exe 外壳，增量更新用不了。
+    // 之前这里没区分：Mac 上会弹「发现新版本」，用户点「立即更新」却收到
+    // 「增量更新只在安装版（exe）下可用」——点了就报错。
+    // 现在把 manualOnly 报给前端，前端改成「重跑安装命令」的说法，不给会失败的按钮。
+    manualOnly: !isPackaged(),
   };
 }
 

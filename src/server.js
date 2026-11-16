@@ -749,6 +749,9 @@ export function createServer(store, opts = {}) {
           remoteVersion: r.remoteVersion,
           localVersion: r.localVersion,
           notes: r.notes,
+          // 3.0.3：true = 这份部署装不了增量包（Mac/Linux 是 node 直接跑）。
+          // 前端据此改成「重跑安装命令」，不再给会失败的「立即更新」按钮。
+          manualOnly: !!r.manualOnly,
         });
       }
 

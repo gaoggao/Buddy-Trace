@@ -3027,13 +3027,23 @@ function showVersionUpdatePrompt(up) {
       up.notes,
     ) : null,
 
-    // 说明
-    el('div', { style: 'font-size:12.5px;color:var(--text-mute);line-height:1.6' },
+    // 3.0.3：Mac / Linux 部署版装不了增量包，给命令而不是给会失败的按钮
+    up.manualOnly ? el('div', { style: 'font-size:12.5px;line-height:1.9' },
+      el('div', { style: 'color:var(--text-mute);margin-bottom:6px' },
+        'Mac / Linux 版升级方式：在终端重跑一次安装命令（会自动拉取最新代码）：'),
+      el('code', {
+        style: 'display:block;padding:10px 12px;background:var(--bg-soft);' +
+          'border:1px solid var(--line-soft);border-radius:8px;font-size:11.5px;' +
+          'word-break:break-all;color:var(--text-dim);user-select:all',
+      }, 'curl -fsSL "https://gitee.com/gaogao2013/Buddy-Trace/raw/master/scripts/install-mac.sh" -o /tmp/bt-install.sh && bash /tmp/bt-install.sh'),
+    ) : el('div', { style: 'font-size:12.5px;color:var(--text-mute);line-height:1.6' },
       '更新会自动备份旧版本，出问题可一键回滚。'),
 
     el('div', { class: 'modal-actions' },
-      el('button', { class: 'btn ghost', onclick: closeModal }, '暂不更新'),
-      el('button', {
+      up.manualOnly
+        ? el('button', { class: 'btn primary', onclick: closeModal }, '知道了')
+        : el('button', { class: 'btn ghost', onclick: closeModal }, '暂不更新'),
+      up.manualOnly ? null : el('button', {
         class: 'btn primary',
         onclick: async function () {
           closeModal();

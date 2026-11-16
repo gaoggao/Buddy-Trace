@@ -245,7 +245,9 @@ if (!args['no-open']) {
     try {
       const { checkUpdate } = await import('./updater.js');
       const up = await checkUpdate(dataDir);
-      if (up && up.hasUpdate) {
+      // 3.0.3：manualOnly（Mac / Linux 部署版）不主动弹界面——
+      // 那种环境装不了增量包，弹出来也只能重跑安装命令，没必要打断用户。
+      if (up && up.hasUpdate && !up.manualOnly) {
         console.log(`  发现新版本 ${up.remoteVersion}，打开界面提示更新`);
         openBrowser(base);
       }

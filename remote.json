@@ -1,1 +1,1 @@
-{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "3.0.2", "code": "code-3.0.2.tar.gz", "sha256": "7c40ff2537991352460548a7724753ec1c953dd87c7a9512ac39b15eff2f603e", "notes": "3.0.2：写进 USER.md 的接入段改为薄指针+钩子（以后改措辞用户不用重粘）；新增旧版接入段检测"}
+{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "3.0.3", "code": "code-3.0.3.tar.gz", "sha256": "b78b1b37a26c1fbc9174f26d600e5fa353716a8a739163b180b5c6ab1824ee6f", "notes": "3.0.3：Mac/Linux 版更新提示改为重跑安装命令（不再出现点了就报错的更新按钮）"}
