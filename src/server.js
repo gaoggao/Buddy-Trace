@@ -25,6 +25,7 @@ import { buildGuide, userSentence, memoryBlock, rememberBlock } from './wb-guide
 import { listCloudSessions, accountMemoryPaths, checkAgentInstalled, wbHomeInfo, saveManualHome, setDataDirHint, accountLastUsed } from './wb-sync.js';
 import { exportAgentArtifacts } from './wb-export.js';
 import { backupNow, backupStatus, saveBackupConfig, getBackupConfig, shouldAutoBackup, cleanupOld } from './backup.js';
+import { exportEncrypted, importEncrypted } from './migration.js';
 import { HELP } from './help-data.js';
 import { checkRemoteUpdate, applyRemoteUpdate, readCachedRemote, readRemoteImage } from './remote.js';
 import { checkUpdate, applyUpdate, rollback, hasBackup } from './updater.js';
@@ -801,6 +802,33 @@ export function createServer(store, opts = {}) {
         res.writeHead(200, { 'Content-Type': mime, 'Content-Length': buf.length, 'Cache-Control': 'no-cache' });
         res.end(buf);
         return;
+      }
+
+      // ── 加密迁移（3.0）：换电脑 / 误删恢复 ──
+      // 导出：一个口令 → 一个加密文件；导入：一个文件 + 口令 → 覆盖恢复（导入前自动兜底备份）
+
+      // 加密导出（返回 base64，前端转 Blob 下载）
+      if (route === 'POST /api/migration/export') {
+        const b = await readBody(req);
+        const r = exportEncrypted(wbDataDir, b.password);
+        if (!r.ok) return sendJson(res, 400, { ok: false, error: r.error });
+        return sendJson(res, 200, {
+          ok: true,
+          name: r.name,
+          data: r.buf.toString('base64'),
+          count: r.count,
+          size: r.size,
+        });
+      }
+
+      // 加密导入（接收 base64）
+      if (route === 'POST /api/migration/import') {
+        const b = await readBody(req);
+        let buf;
+        try { buf = Buffer.from(String(b.data || ''), 'base64'); } catch { return sendJson(res, 400, { ok: false, error: '文件内容读不了' }); }
+        const r = importEncrypted(wbDataDir, buf, b.password);
+        if (!r.ok) return sendJson(res, 400, { ok: false, error: r.error });
+        return sendJson(res, 200, { ok: true, restored: r.restored, safety: r.safety });
       }
 
       if (route === 'GET /api/backup') {

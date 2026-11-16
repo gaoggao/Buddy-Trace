@@ -93,6 +93,24 @@ const I18N = {
     backupNow: '立即备份',
     backupRunning: '正在备份…',
     backupDone: '备份完成：{name}（{size}）',
+    // 加密迁移（3.0）
+    migrateTitle: '迁移到别的电脑',
+    migrateDesc: '设一个口令，把整个记忆库加密成一个文件，拷到另一台电脑上导入。文件里有你的记录，请像密码一样保管好。',
+    migrateExportLabel: '导出（这台电脑）',
+    migrateExportHint: '口令至少 6 位。导出后把文件拷到新电脑。',
+    migrateExportPwPh: '设置一个口令',
+    migrateExportBtn: '导出加密备份',
+    migrateExporting: '正在加密…',
+    migrateExportDone: '已导出：{name}',
+    migrateImportLabel: '导入（新电脑）',
+    migrateImportHint: '选文件 + 输入当时的口令。导入会覆盖当前库，但会先自动备份一份当前数据。',
+    migrateImportPwPh: '输入口令',
+    migrateImportBtn: '导入',
+    migrateImporting: '正在导入…',
+    migrateImportDone: '已恢复 {n} 个文件',
+    migratePwShort: '口令至少 6 位',
+    migrateNoFile: '先选一个备份文件',
+    migrateFileTooBig: '文件太大（超过 200MB）',
     // 账号清单（概览页，默认合并）
     accountsTitleOverview: '这台电脑上有 {n} 个账号',
     accountsDescOverview: '这些账号的记录都在同一个库里，WorkBuddy 能查到全部 —— 它需要什么就调什么，不用管在哪个账号里。',
@@ -1985,7 +2003,91 @@ async function buildBackupPanel() {
   };
   panel.append(nowBtn);
 
+  panel.append(buildMigrationPanel(panel));
+
   return panel;
+}
+
+/**
+ * 加密迁移面板（3.0）：导出 = 口令 → 一个 .btbackup 文件；导入 = 文件 + 口令 → 覆盖恢复
+ */
+function buildMigrationPanel(backupPanel) {
+  const box = el('div', { class: 'content-box', style: 'margin-top:20px' });
+  box.append(el('h3', { style: 'font-size:15px;font-weight:650;margin-bottom:6px' }, t('migrateTitle')));
+  box.append(el('p', { style: 'font-size:12.5px;color:var(--text-mute);margin-bottom:16px;line-height:1.75' }, t('migrateDesc')));
+
+  // ── 导出 ──
+  box.append(el('div', { style: 'font-size:12.5px;font-weight:650;color:var(--text-dim);margin-bottom:7px' }, t('migrateExportLabel')));
+  box.append(el('div', { style: 'font-size:12px;color:var(--text-mute);margin-bottom:7px' }, t('migrateExportHint')));
+
+  const expPw = el('input', { type: 'password', placeholder: t('migrateExportPwPh'), style: 'flex:1' });
+  const expBtn = el('button', { class: 'btn primary', style: 'white-space:nowrap' }, t('migrateExportBtn'));
+  expBtn.onclick = async function () {
+    const pw = expPw.value.trim();
+    if (pw.length < 6) { toast(t('migratePwShort'), 'error'); return; }
+    expBtn.disabled = true;
+    expBtn.textContent = t('migrateExporting');
+    try {
+      const r = await API.post('/api/migration/export', { password: pw });
+      if (!r.ok) { toast(r.error || t('errGeneric'), 'error'); return; }
+      // base64 → Blob → 下载
+      const bin = atob(r.data);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'application/octet-stream' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = r.name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast(t('migrateExportDone', { name: r.name }), 'ok');
+    } finally {
+      expBtn.disabled = false;
+      expBtn.textContent = t('migrateExportBtn');
+    }
+  };
+  box.append(el('div', { style: 'display:flex;gap:8px;margin-bottom:18px' }, expPw, expBtn));
+
+  // ── 导入 ──
+  box.append(el('div', { style: 'font-size:12.5px;font-weight:650;color:var(--text-dim);margin-bottom:7px' }, t('migrateImportLabel')));
+  box.append(el('div', { style: 'font-size:12px;color:var(--text-mute);margin-bottom:7px' }, t('migrateImportHint')));
+
+  const impFile = el('input', { type: 'file', accept: '.btbackup', style: 'font-size:12px;margin-bottom:7px' });
+  const impPw = el('input', { type: 'password', placeholder: t('migrateImportPwPh'), style: 'flex:1' });
+  const impBtn = el('button', { class: 'btn', style: 'white-space:nowrap' }, t('migrateImportBtn'));
+  impBtn.onclick = async function () {
+    const f = impFile.files && impFile.files[0];
+    if (!f) { toast(t('migrateNoFile'), 'error'); return; }
+    if (f.size > 200 * 1024 * 1024) { toast(t('migrateFileTooBig'), 'error'); return; }
+    const pw = impPw.value.trim();
+    if (pw.length < 6) { toast(t('migratePwShort'), 'error'); return; }
+    impBtn.disabled = true;
+    impBtn.textContent = t('migrateImporting');
+    try {
+      const buf = await f.arrayBuffer();
+      let bin = '';
+      const bytes = new Uint8Array(buf);
+      const CHUNK = 0x8000;
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+      }
+      const r = await API.post('/api/migration/import', { data: btoa(bin), password: pw });
+      if (!r.ok) { toast(r.error || t('errGeneric'), 'error'); return; }
+      toast(t('migrateImportDone', { n: r.restored }), 'ok');
+      // 刷新备份面板（显示新数据 + 兜底备份）
+      if (backupPanel && backupPanel.parentNode) {
+        const fresh = await buildBackupPanel();
+        backupPanel.replaceWith(fresh);
+      }
+    } finally {
+      impBtn.disabled = false;
+      impBtn.textContent = t('migrateImportBtn');
+    }
+  };
+  box.append(el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' }, impPw, impBtn));
+  box.append(impFile);
+
+  return box;
 }
 
 /**

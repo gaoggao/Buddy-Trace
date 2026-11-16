@@ -85,6 +85,9 @@ async function fetchRemoteConfig() {
  * @returns {Promise<{hasUpdate:boolean, remoteVersion:string|null, localVersion:string, notes:string, cfg:object|null}>}
  */
 export async function checkUpdate(dataDir) {
+  if (isPortable()) {
+    return { hasUpdate: false, remoteVersion: null, localVersion: VERSION, notes: '', cfg: null };
+  }
   const cfg = await fetchRemoteConfig();
   if (!cfg || !cfg.version) {
     return { hasUpdate: false, remoteVersion: null, localVersion: VERSION, notes: '', cfg: null };
@@ -134,7 +137,20 @@ function isPackaged() {
   return execName.endsWith('.exe') && execName !== 'node.exe';
 }
 
+/**
+ * 是否便携版（3.0）：便携版不解压到系统目录，数据随 ZIP 走，
+ * 自动更新会改 code/ 目录、跟便携版的"解压即用"语义冲突，
+ * 所以便携版一律不参与自动更新（靠手动换新版 ZIP 升级）。
+ * 识别：启动脚本设 BT_PORTABLE=1。
+ */
+function isPortable() {
+  return process.env.BT_PORTABLE === '1';
+}
+
 export async function applyUpdate(dataDir, cfg = null) {
+  if (isPortable()) {
+    return { ok: false, error: '便携版不参与自动更新，请下载新版 ZIP 覆盖升级' };
+  }
   if (!isPackaged()) {
     return { ok: false, error: '增量更新只在安装版（exe）下可用，开发模式请直接改源码' };
   }

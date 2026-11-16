@@ -78,6 +78,70 @@ function buildCodePack() {
   return out;
 }
 
+/**
+ * 打便携版 ZIP（3.0）：
+ *   · exe + 启动/停止脚本 + 说明，解压即用，不写注册表、不建快捷方式
+ *   · 数据目录在 exe 旁边的 data/（defaultDataDir 天然如此，数据随目录走）
+ *   · 启动脚本设 BT_PORTABLE=1 → updater 里 checkUpdate/applyUpdate 直接拒绝，不自动更新
+ */
+function buildPortableZip() {
+  const stage = fs.mkdtempSync(path.join(ROOT, '.portable-'));
+  const zipName = `BuddyTrace-Portable-${pkg.version}.zip`;
+  const out = path.join(DIST, zipName);
+  try {
+    // ① 拷 exe
+    const exeSrc = path.join(DIST, 'BuddyTrace.exe');
+    if (!fs.existsSync(exeSrc)) throw new Error('先打 BuddyTrace.exe 再打便携包');
+    fs.copyFileSync(exeSrc, path.join(stage, 'BuddyTrace.exe'));
+
+    // ② 启动脚本（设 BT_PORTABLE=1）
+    fs.writeFileSync(path.join(stage, 'Start-BuddyTrace.cmd'), [
+      '@echo off',
+      'chcp 65001 >nul',
+      'cd /d "%~dp0"',
+      'set BT_PORTABLE=1',
+      'start "" "BuddyTrace.exe"',
+      'exit',
+    ].join('\r\n'), 'utf8');
+
+    // ③ 停止脚本
+    fs.writeFileSync(path.join(stage, 'Stop-BuddyTrace.cmd'), [
+      '@echo off',
+      'chcp 65001 >nul',
+      'echo 正在停止 Buddy Trace...',
+      'taskkill /IM BuddyTrace.exe /F 2>nul',
+      'echo 已停止（如有正在进行的任务，已安全中断）',
+      'timeout /t 1 >nul',
+      'exit',
+    ].join('\r\n'), 'utf8');
+
+    // ④ 说明
+    fs.writeFileSync(path.join(stage, '便携版说明.txt'), [
+      'Buddy Trace 便携版（免安装）',
+      '',
+      '1. 整个目录解压到一个有写入权限的地方（不要直接在压缩包里运行）',
+      '2. 双击 Start-BuddyTrace.cmd 启动',
+      '3. 停止：双击 Stop-BuddyTrace.cmd',
+      '',
+      '说明：',
+      '- 数据目录在 exe 旁边的 data/，随整个目录一起搬走',
+      '- 便携版不参与自动更新；升级时先 Stop，再用新版 ZIP 覆盖解压',
+      '- 同一份便携版不要同时开两份（数据会互相打架）',
+    ].join('\r\n'), 'utf8');
+
+    // ⑤ 打包（bsdtar 按 .zip 后缀自动打成 zip）
+    if (fs.existsSync(out)) fs.unlinkSync(out);
+    execFileSync('tar', ['-a', '-cf', out, '-C', stage, '.'], { stdio: 'inherit' });
+    if (!fs.existsSync(out)) throw new Error('便携包生成失败');
+
+    const mb = (fs.statSync(out).size / 1024 / 1024).toFixed(1);
+    console.log(`  ✓ 便携版 ${zipName}  ${mb} MB`);
+    return out;
+  } finally {
+    try { fs.rmSync(stage, { recursive: true, force: true }); } catch { /* 忽略 */ }
+  }
+}
+
 function build(which) {
   const t = TARGETS[which];
   if (!t) throw new Error('未知目标: ' + which);
@@ -136,6 +200,11 @@ function main() {
       outs.push(buildCodePack());
     } catch (e) {
       console.error('  ✗ 增量包失败: ' + e.message);
+    }
+    try {
+      outs.push(buildPortableZip());
+    } catch (e) {
+      console.error('  ✗ 便携包失败: ' + e.message);
     }
   }
 
