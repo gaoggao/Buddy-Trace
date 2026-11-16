@@ -25,6 +25,8 @@ import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { extractSessions } from './wb-extract.js';
 import { harvestAccountNames } from './wb-account-names.js';
+import { VERSION } from './version.js';
+import { GUIDE_VERSION_RE } from './wb-guide.js';
 
 /**
  * 用户手动指定的 WorkBuddy 目录
@@ -925,7 +927,19 @@ export function checkAgentInstalled(dataDir) {
     }
 
     if (picked) {
-      const info = { ...base, path: picked.path, file: picked.file, hasFile: true, installed: true, size: picked.size, mtime: picked.mtime };
+      const info = {
+        ...base,
+        path: picked.path,
+        file: picked.file,
+        hasFile: true,
+        installed: true,
+        size: picked.size,
+        mtime: picked.mtime,
+        // 3.0.2：判断用户粘的这段是不是旧版。
+        // 老版本没有版本标记行 → guideVersion 为 null → 也算旧版，需要重粘一次。
+        guideVersion: picked.guideVersion || null,
+        stale: picked.guideVersion !== VERSION,
+      };
       all.push(info);
       installed.push(info);
     } else {
@@ -968,10 +982,13 @@ export function checkAgentInstalled(dataDir) {
  */
 function looksInstalled(content) {
   if (!content) return false;
-  if (/##\s*Buddy\s*Trace/i.test(content)) return true;
+  const hasSection = /##\s*Buddy\s*Trace/i.test(content);
   const hasName = /Buddy\s*Trace/i.test(content);
   const hasApi = /127\.0\.0\.1:\d+\/api\//.test(content);
-  return hasName && hasApi;
+  if (!hasSection && !(hasName && hasApi)) return false;
+  // 3.0.2：顺手把「接入说明版本」抽出来，用来判断用户粘的是不是旧版
+  const m = content.match(GUIDE_VERSION_RE);
+  return { guideVersion: m ? m[1] : null };
 }
 
 /**

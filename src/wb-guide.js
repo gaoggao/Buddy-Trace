@@ -10,6 +10,14 @@
  *   ③ agent 自己分辨账号 —— 用昵称（抓不到就用代号），不需要用户点名
  */
 
+import { VERSION } from './version.js';
+
+/** 写进 USER.md 那段里的版本标记行——用来判断用户粘的是不是旧版 */
+export const GUIDE_VERSION_RE = /接入说明版本：([0-9]+\.[0-9]+\.[0-9]+)/;
+export function guideVersionLine() {
+  return `> 接入说明版本：${VERSION}（这一行只是版本标记，用来判断你读到的是不是旧版）`;
+}
+
 /**
  * 给用户的一句话（用户复制粘贴给新 agent 用）
  *
@@ -667,6 +675,8 @@ export function memoryBlock(port, lang = 'zh', paths = {}) {
   const base = `http://127.0.0.1:${port}`;
   const exportDir = paths.exportDir || '';
   const dataDir = paths.dataDir || '';
+  // 规则文件路径：优先本地文件（实测 WorkBuddy 会拦 127.0.0.1，读文件一定可用）
+  const rulesPath = exportDir ? exportDir + '\\agent-rules.md' : '';
   if (lang === 'en') {
     return [
       '## WorkBuddy memory library',
@@ -684,69 +694,40 @@ export function memoryBlock(port, lang = 'zh', paths = {}) {
     ].join('\n');
   }
   return [
-    '## Buddy Trace',
+    '## Buddy Trace · 你的长期记忆库',
     '',
-    `本机有一个记忆库 \`${base}\` —— 是你**自己的长期记忆**，`,
+    '本机有一个记忆库 `' + base + '` —— 是你**自己的长期记忆**，',
     '存着这个用户和你（在**所有 WorkBuddy 账号、所有会话**里）做过的一切。',
     '**工作当中随时可以查**，不用等用户提醒。',
-    '完整说明（本地文件，直接打开就能读）：' + (exportDir ? ' \`' + exportDir + '\\agent-rules.md\`' : ''),
-    '（HTTP 方式：`curl.exe -sS ' + base + '/agent-rules`）',
     '',
-    '**触发规则**：',
-    '用户说出下面任何一类话，**先查记忆库，再回答**：',
+    '### 遇到问题、找不到的时候，第一个动作就是读这个文件',
+    '',
+    rulesPath ? '`' + rulesPath + '`' : '`' + base + '/agent-rules`',
+    '',
+    '**哪些情况算「遇到问题 / 找不到」**：',
     '```',
-    '· 「继续」「接着」「接着做」「接着上次」「往下做」「继续那个」',
-    '· 「上次那个」「之前那个」「上次做的」「老样子」「你之前弄的」',
-    '· 「我是不是弄过」「我记得弄过」「好像做过」「有没有做过」',
-    '· 提到你不记得的人名 / 项目名 / 文件名 / 游戏名',
-    '· 你自己记忆里没有、但用户觉得你应该知道的事 → 立刻来查',
+    '· 用户问的事你答不上来，「不知道」「没做过」「第一次」马上就要说出口了',
+    '· 你觉得「这事好像做过」，但想不起细节',
+    '· 查了记忆库但没查到，或者查到了、却不确定该怎么用',
+    '· 用户说「继续 / 接着做 / 上次那个 / 之前做的」，你却找不到上次那条',
     '```',
-    '**查不到正文时**：不要直接说「不知道」，先重新读一遍完整说明文件' + (exportDir ? ' \`' + exportDir + '\\agent-rules.md\`' : '') + '，',
-    '按里面第五章的方法再查一次（带上 account 参数、用 /api/search 搜关键词）。',
+    '**为什么值得读**：这是本机最全的一份说明书 —— 怎么查、库里到底有什么、',
+    '什么查得到、什么查不到、边界在哪，都写在里面。',
+    '上面那几条速查只是应急；**按说明书来，命中率更高、也更少走弯路**。',
+    '它随软件版本更新，所以每次读到的都是当前版本的说法。',
     '',
-    '**说「不知道 / 没做过 / 第一次」之前，先查过一次** —— 查过再回答，答案会更准。',
-    '',
-    '**怎么查**（两种方式，按你环境能用的选）：',
+    '### 速查（不读文件也能直接用）',
     '```',
-    `① 能跑命令就用 HTTP（推荐，能搜能筛）：`,
-    `   curl.exe -sS "${base}/api/list?limit=100"`,
-    `   curl.exe -sS "${base}/api/cloud-sessions"    ← 手机版会话清单`,
-    `   curl.exe -sS -X POST "${base}/api/search" -H "Content-Type: application/json" -d "{\\"q\\":\\"<关键词>\\"}"`,
-    '',
-    '② 跑不了命令就读本地文件（不经过网络，一定可用）：',
-    '   索引 ' + (exportDir ? exportDir + '\\index.md' : '<导出目录>\\index.md'),
-    '   正文 按索引给的路径打开（相对于数据目录 ' + (dataDir || '<数据目录>') + '）',
-    '```',
-    '**不要全读** —— 看标题判断哪几条相关，只打开那几条。',
-    '',
-    '**注意**：`/api/cloud-sessions` 里那些是【手机版】会话 —— 只有标题和时间，',
-    '**正文在云端、本地没有**。能告诉用户"这事在哪"，但别假装看过内容。',
-    '',
-    '**库里有 5 个部分，都对你敞开**（不带 kind 参数就全查）：',
-    '```',
-    '· 技能    skill          怎么做（操作步骤、工具用法）',
-    '· 知识    wiki           是什么（资料、结论、项目背景）',
-    '· 变更    changelog      为什么改（每次改动的推理过程）',
-    '· 记忆    memory         当时聊了什么（对话上下文）',
-    '· 外部    external-*     ← 注意，见下',
+    'curl.exe -sS "' + base + '/api/accounts"                  ← 这台电脑上有哪些账号',
+    'curl.exe -sS "' + base + '/api/list?uid=*&limit=50"       ← 所有账号的最近记录',
+    'curl.exe -sS -X POST "' + base + '/api/search" -H "Content-Type: application/json" -d "{\\"q\\":\\"<关键词>\\"}"',
     '```',
     '',
-    '**⚠ 外部资源要分清楚**：`external-candidate` / `external-wiki` / `external-skill`',
-    '这一类是**用户自己从外面导进来的**（粘贴的 GitHub 链接、别人的说明书、工具介绍），',
-    '**不是你原来的记忆，也不是用户自己做出来的成果。**',
-    '```',
-    '· 引用它的时候要说清来源（「你之前存的那个工具…」），别当成用户干过的事',
-    '· 查法：curl.exe -sS "' + base + '/api/list?sourceType=external&limit=200"',
-    '· 用户问「有没有存过类似的东西 / 那个工具怎么用来着」→ 查这个库',
-    '```',
+    '### 一条硬规则',
+    '**你自己记忆里没有、但用户觉得你应该知道的事 → 先查，再回答。**',
+    '不要一上来就说「不知道 / 没做过 / 第一次」。',
     '',
-    '**高频词提示**：',
-    '用户说话里出现下面任何这些词时，可以读一遍 ' + (exportDir ? '`' + exportDir + '\\Remember.md`' : '`<导出目录>\\Remember.md`') + '，',
-    '那是很短的背景提示，读完继续工作即可。不读也不影响。',
-    '```',
-    '文件 file、代码 code、数据 data、报告 report、文档 document、脚本 script、模型 model、配置 config、项目 project',
-    '```',
-    '',
+    guideVersionLine(),
   ].join('\n');
 }
 

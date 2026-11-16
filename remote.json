@@ -1,1 +1,1 @@
-{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "3.0.1", "code": "code-3.0.1.tar.gz", "sha256": "70dbd7f0261e334912e925dadbf329b8883ac6190178cfa67226cbed4f6cb5c3", "notes": "3.0.1：修复接入状态误报；定位措辞从「备份」改为「记忆·随时可查」；撤销便携版"}
+{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "3.0.2", "code": "code-3.0.2.tar.gz", "sha256": "7c40ff2537991352460548a7724753ec1c953dd87c7a9512ac39b15eff2f603e", "notes": "3.0.2：写进 USER.md 的接入段改为薄指针+钩子（以后改措辞用户不用重粘）；新增旧版接入段检测"}
