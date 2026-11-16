@@ -31,12 +31,15 @@ export function userSentence(port, lang = 'zh', guidePath) {
   if (lang === 'en') {
     if (guidePath) {
       return [
-        'I set up a local memory library — it is your own long-term memory backup.',
+        'I set up a local memory library — it is your own long-term memory, queryable while you work.',
         '',
         `First read this file (local file, just open it): ${guidePath}`,
         '',
         'After reading, follow what it says — especially Chapter 0, which tells you how to connect yourself in,',
         'so that every new session you open will automatically know to check.',
+        '',
+        'Rule of thumb: when something is not in your own memory but the user expects you to know it,',
+        'query this library before answering — do not say "I don\'t know" first.',
         '',
         '(When writing to your own USER.md: if there is already a "## Buddy Trace" section,',
         ' overwrite the whole section; if not, add it. Do not append.)',
@@ -44,11 +47,11 @@ export function userSentence(port, lang = 'zh', guidePath) {
         '用中文回复。',
       ].join('\n');
     }
-    return `Read ${base}/agent-rules first — it is your own long-term memory backup in WorkBuddy.`;
+    return `Read ${base}/agent-rules first — it is your own long-term memory in WorkBuddy, queryable any time you work.`;
   }
   if (guidePath) {
     return [
-      '我装了一个本地记忆库，是你自己的长期记忆备份。',
+      '我装了一个本地记忆库，是你自己的长期记忆——工作当中随时可以查。',
       '',
       `先读一下这个文件（本地文件，直接打开就行）：`,
       guidePath,
@@ -56,11 +59,14 @@ export function userSentence(port, lang = 'zh', guidePath) {
       '读完按里面的要求做 —— 特别是第零章，让你把自己接进去，',
       '这样以后你每开一个新会话，都会自动知道来查。',
       '',
+      '记住一条：你自己记忆里没有、但用户觉得你应该知道的事，**先来这里查，再回答**。',
+      '不要一上来就说「不知道 / 没做过」。',
+      '',
       '（写进你自己 USER.md 时：已经有「## Buddy Trace」这一节就整节覆盖，',
       '  没有就写进去。别往后追加。）',
     ].join('\n');
   }
-  return `先读一下 ${base}/agent-rules，那是你在 WorkBuddy 里的长期记忆备份。`;
+  return `先读一下 ${base}/agent-rules，那是你在 WorkBuddy 里的长期记忆——工作当中随时可查。`;
 }
 
 /** 列出本机检测到的账号 USER.md 完整路径（给 agent 直接用，省得它自己找） */
@@ -94,7 +100,8 @@ export function buildGuide(port, opts = {}) {
 你正在一台装了 **Buddy Trace** 的电脑上工作。
 这份说明是 Buddy Trace **在这台电脑上、根据本机实际数据实时生成**的——
 下面列出的账号、路径、记录数，都是本机检测到的真实情况，不是通用模板。
-这个库是**你自己的长期记忆备份** —— 用户用 WorkBuddy 做过的所有事，都留了一份。
+这个库是**你自己的长期记忆** —— 用户用 WorkBuddy 做过的所有事，都留了一份；
+**工作当中随时可以查，不用等谁提醒。**
 
 **它解决的是 WorkBuddy 自身的两个记忆局限：**
 \`\`\`
@@ -629,7 +636,9 @@ curl -sS "${base}/api/list?limit=100"
 - **手机 App 的会话**：存在云端，本地磁盘上没有，这个库查不到
 - **产出物本身**（视频、报告、代码文件）：不在库里，在工作区目录里（用户自己知道在哪）
 - **本库只管"记忆"这一层**：记忆、知识、技能、变更原因
-- **这是只读的备份**：不是实时的、不是你当前会话的记忆 —— 它是**过去的留档**
+- **它是「记忆」，不是「当前上下文」**：存的是过去的记录，只读不写。
+  所以你当前会话里没有它很正常 —— **正因为没有，才要来查。**
+  不查就说「不知道 / 没做过」，是最容易犯的错。
 
 ---
 
@@ -662,21 +671,24 @@ export function memoryBlock(port, lang = 'zh', paths = {}) {
     return [
       '## WorkBuddy memory library',
       '',
-      `There is a local memory library at ${base} — a full backup of everything you and the user have done in WorkBuddy (all accounts and sessions).`,
+      `There is a local memory library at ${base} — your own long-term memory of everything you and the user have done in WorkBuddy (all accounts and sessions).`,
       `Read ${base}/agent-rules to learn how to query it.`,
       'Query it whenever you suspect "this was done before but I cannot recall it" —',
       'the user says "continue" / "the previous one", asks "why was this decided",',
-      'starts something with history, or you simply feel short on context:',
+      'starts something with history, or something is not in your own memory but the user expects you to know it:',
       `\`curl.exe -sS "${base}/api/accounts"\` then \`curl.exe -sS "${base}/api/list?account=<name>&limit=100"\``,
       '(omit the account param to search every account)',
+      '',
+      'Never answer "I don\'t know / never did that" before querying this library once.',
       '',
     ].join('\n');
   }
   return [
     '## Buddy Trace',
     '',
-    `本机有一个记忆库 \`${base}\` —— 是你**自己的长期记忆备份**，`,
+    `本机有一个记忆库 \`${base}\` —— 是你**自己的长期记忆**，`,
     '存着这个用户和你（在**所有 WorkBuddy 账号、所有会话**里）做过的一切。',
+    '**工作当中随时可以查**，不用等用户提醒。',
     '完整说明（本地文件，直接打开就能读）：' + (exportDir ? ' \`' + exportDir + '\\agent-rules.md\`' : ''),
     '（HTTP 方式：`curl.exe -sS ' + base + '/agent-rules`）',
     '',
@@ -687,6 +699,7 @@ export function memoryBlock(port, lang = 'zh', paths = {}) {
     '· 「上次那个」「之前那个」「上次做的」「老样子」「你之前弄的」',
     '· 「我是不是弄过」「我记得弄过」「好像做过」「有没有做过」',
     '· 提到你不记得的人名 / 项目名 / 文件名 / 游戏名',
+    '· 你自己记忆里没有、但用户觉得你应该知道的事 → 立刻来查',
     '```',
     '**查不到正文时**：不要直接说「不知道」，先重新读一遍完整说明文件' + (exportDir ? ' \`' + exportDir + '\\agent-rules.md\`' : '') + '，',
     '按里面第五章的方法再查一次（带上 account 参数、用 /api/search 搜关键词）。',

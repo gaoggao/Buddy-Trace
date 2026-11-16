@@ -1,1 +1,1 @@
-{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "3.0.0", "code": "code-3.0.0.tar.gz", "sha256": "ed58520ac9a6786e09ce6b6114d46c9b9d176cacf46f9724c44b1cd7a6a62b36", "notes": "3.0.0：新增加密迁移（口令加密备份，换电脑导入即恢复）；新增 Windows 便携版（免安装 ZIP）"}
+{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "3.0.1", "code": "code-3.0.1.tar.gz", "sha256": "70dbd7f0261e334912e925dadbf329b8883ac6190178cfa67226cbed4f6cb5c3", "notes": "3.0.1：修复接入状态误报；定位措辞从「备份」改为「记忆·随时可查」；撤销便携版"}

@@ -897,29 +897,81 @@ export function checkAgentInstalled(dataDir) {
   for (const e of ents) {
     if (!e.isDirectory() || !/^user-.+-personal$/.test(e.name)) continue;
     const uid = e.name.replace(/^user-/, '').replace(/-personal$/, '');
-    const memPath = path.join(wb, e.name, 'MEMORY.md');
     const nick = accounts[uid] && accounts[uid].nickname;
-    const info = {
+    const base = {
       uid,
       // 有昵称用昵称，没昵称用 uid 前 8 位（启动就能显示，不等登录）
       name: nick || ('账号 ' + uid.slice(0, 8)),
       hasNickname: !!nick,
-      path: memPath,
-      hasFile: false,
-      installed: false,
-      size: 0,
     };
-    if (exists(memPath)) {
-      info.hasFile = true;
-      const c = read(memPath);
-      info.size = c.length;
-      // 判断依据：那段引导的两个特征（服务地址 / 标题）
-      info.installed = /127\.0\.0\.1:\d+\/api\/accounts/.test(c) || /Buddy Trace/.test(c);
+
+    // 2026-11-16 修（老板实测发现）：
+    //   原来只查 MEMORY.md，但引导语让 agent 写进 USER.md →
+    //   接入成功的账号（高峰那次）在界面上仍显示「未接入」。
+    //   现在两个文件都查，USER.md 优先，并回报"写在哪个文件"。
+    const candidates = [
+      { file: 'USER.md', path: path.join(wb, e.name, 'USER.md') },
+      { file: 'MEMORY.md', path: path.join(wb, e.name, 'MEMORY.md') },
+    ];
+    let picked = null;
+    for (const c of candidates) {
+      if (!exists(c.path)) continue;
+      const content = read(c.path);
+      if (!looksInstalled(content)) continue;
+      let mtime = 0;
+      try { mtime = fs.statSync(c.path).mtimeMs; } catch { /* 忽略 */ }
+      picked = { file: c.file, path: c.path, size: content.length, mtime };
+      break;   // USER.md 优先
     }
-    all.push(info);
-    (info.installed ? installed : missing).push(info);
+
+    if (picked) {
+      const info = { ...base, path: picked.path, file: picked.file, hasFile: true, installed: true, size: picked.size, mtime: picked.mtime };
+      all.push(info);
+      installed.push(info);
+    } else {
+      // 没接入：把存在的那个文件也报上去，方便判断"是空文件还是写错位置"
+      let anyFile = null;
+      for (const c of candidates) {
+        if (!exists(c.path)) continue;
+        let mtime = 0;
+        let size = 0;
+        try {
+          const st = fs.statSync(c.path);
+          mtime = st.mtimeMs;
+          size = read(c.path).length;
+        } catch { /* 忽略 */ }
+        anyFile = { file: c.file, path: c.path, size, mtime };
+        break;
+      }
+      const info = {
+        ...base,
+        path: anyFile ? anyFile.path : path.join(wb, e.name, 'USER.md'),
+        file: anyFile ? anyFile.file : null,
+        hasFile: !!anyFile,
+        installed: false,
+        size: anyFile ? anyFile.size : 0,
+        mtime: anyFile ? anyFile.mtime : 0,
+      };
+      all.push(info);
+      missing.push(info);
+    }
   }
   return { installed, missing, all };
+}
+
+/**
+ * 判断一段内容里有没有「接入段」。
+ *
+ * 判定（宁可宽松，也不要误报未接入）：
+ *   · 有 `## Buddy Trace` 标题  或
+ *   · 同时出现 "Buddy Trace" 和 指向本机服务的 /api/ 调用
+ */
+function looksInstalled(content) {
+  if (!content) return false;
+  if (/##\s*Buddy\s*Trace/i.test(content)) return true;
+  const hasName = /Buddy\s*Trace/i.test(content);
+  const hasApi = /127\.0\.0\.1:\d+\/api\//.test(content);
+  return hasName && hasApi;
 }
 
 /**
