@@ -11,4 +11,4 @@
  * 所以 /api/health 返回的版本号能正确反映外部 code 的版本。
  */
 
-export const VERSION = '3.0.3';
+export const VERSION = '3.0.4';

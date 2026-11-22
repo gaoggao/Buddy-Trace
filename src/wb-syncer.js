@@ -13,9 +13,11 @@
  */
 
 import crypto from 'node:crypto';
+import { Worker } from 'node:worker_threads';
 import { scan, captureLoginAccount, loadAccounts, harvestAccountNamesToStore } from './wb-sync.js';
 import { backupNow, shouldAutoBackup } from './backup.js';
 import { DEFAULT_PORTS } from './ports.js';
+import { svcLog } from './service-log.js';
 
 const DEFAULT_INTERVAL_MS = 30 * 60 * 1000;
 
@@ -76,6 +78,36 @@ export class WbSyncer {
   }
 
   /**
+   * 在 worker 线程里跑同步扫描（3.0.4）
+   *
+   * scan() 扫 8 万个文件要 6 秒，是同步函数，占住主线程 → 那 6 秒服务不响应，
+   * 用户看到「网页打不开，过一会自己好了」。放进 worker 后主线程照常应答。
+   *
+   * 容错：worker 失败 / 超时 → 回退到主线程 scan()，功能不丢。
+   */
+  #scanInWorker(opts) {
+    return new Promise((resolve) => {
+      let w;
+      try {
+        w = new Worker(new URL('./scan-worker.js', import.meta.url), { workerData: opts });
+      } catch { resolve(null); return; }
+      let done = false;
+      const finish = (v) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        try { w.terminate().catch(() => {}); } catch { /* ignore */ }
+        resolve(v);
+      };
+      // 兜底超时 4 分钟（正常 6 秒，冷启动几十秒顶天）
+      const timer = setTimeout(() => finish(null), 4 * 60 * 1000);
+      w.on('message', (m) => finish(m && m.ok ? m.result : null));
+      w.on('error', () => finish(null));
+      w.on('exit', (code) => { if (code !== 0) finish(null); });
+    });
+  }
+
+  /**
    * 同步一次
    * @param {object} [o]
    * @param {boolean} [o.force] 忽略 mtime 缓存（手动强制全扫）
@@ -100,9 +132,14 @@ export class WbSyncer {
       harvested = harvestAccountNamesToStore(this.dataDir);
     } catch { /* 挖不到就算了，不影响扫描 */ }
 
-      // ② 扫描
+      // ② 扫描（3.0.4：放进 worker，主线程不被 6 秒的同步扫描卡住）
       if (o.force) { this.mtimeCache = new Map(); this.sessCache = new Map(); }
-      const res = scan({ dataDir: this.dataDir, mtimeCache: this.mtimeCache, sessCache: this.sessCache });
+      const scanOpts = { dataDir: this.dataDir, mtimeCache: this.mtimeCache, sessCache: this.sessCache };
+      const wres = await this.#scanInWorker(scanOpts);
+      // worker 失败/超时 → 回退主线程，保证功能不丢（旧行为）
+      const viaWorker = !!wres;
+      const res = wres || scan(scanOpts);
+      svcLog(`同步扫描：${Date.now() - t0}ms  来源=${viaWorker ? 'worker' : '主线程(回退)'}  条目=${res.items.length}  扫描文件=${res.stats.scanned}`);
 
       // ③ 去重写入（内容变了要更新，不能只按 fingerprint 跳过）
       //

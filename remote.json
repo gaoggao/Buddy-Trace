@@ -1,1 +1,1 @@
-{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "3.0.3", "code": "code-3.0.3.tar.gz", "sha256": "b78b1b37a26c1fbc9174f26d600e5fa353716a8a739163b180b5c6ab1824ee6f", "notes": "3.0.3：Mac/Linux 版更新提示改为重跑安装命令（不再出现点了就报错的更新按钮）"}
+{"qr": {"enabled": true, "image": "qr.png", "title": "加入交流群"}, "version": "3.0.4", "code": "code-3.0.4.tar.gz", "sha256": "fb9fe2269197c91f485216f461d1db7b83a5b8d9d391eebaad68c760354163f0", "notes": "3.0.4：修复服务打不开——同步扫描移入worker不卡主线程；watchdog加健康探测+卡死自愈+日志"}

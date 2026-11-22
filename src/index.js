@@ -18,6 +18,7 @@ import { Config } from './config.js';
 import { createServer, listenWithFallback } from './server.js';
 import { resolvePorts } from './ports.js';
 import { readRuntime, writeRuntime, existingInstance, isPidAlive, readLock, acquireLock, releaseLock, updateLockPort, reportFatal } from './runtime.js';
+import { initServiceLog, svcLog } from './service-log.js';
 
 const args = parseArgs(process.argv.slice(2));
 
@@ -62,6 +63,8 @@ function defaultDataDir() {
 }
 
 const dataDir = path.resolve(args.data || defaultDataDir());
+initServiceLog(dataDir);   // 3.0.4：服务日志（打包后 console 看不到，必须落盘）
+svcLog(`启动：pid=${process.pid} dataDir=${dataDir}`);
 // 端口备选：跳跃分布，避免"整片端口被占"时连续失败（老板 2026-11-03 要求）
 // 统一从 ports.js 拿，环境变量 BT_PORTS 可覆盖（分号分隔），方便部署时改
 const ports = resolvePorts({ portArg: args.port });
@@ -213,6 +216,7 @@ try {
 } catch (e) { /* 静默，用本地缓存兜底 */ }
 
 const base = `http://127.0.0.1:${actualPort}`;
+svcLog(`服务已启动：端口 ${actualPort}`);
 console.log(`  ✓ 服务已启动`);
 console.log(`    界面: ${base}`);
 console.log(`    接口: ${base}/api/health`);

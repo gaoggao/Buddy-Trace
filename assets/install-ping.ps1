@@ -24,7 +24,7 @@ try {
     [System.IO.File]::WriteAllText($idFile, $id)
   }
 
-  $payload = '{"id":"' + $id + '","v":"' + $Version + '"}'
+  $payload = '{"id":"' + $id + '","v":"' + $Version + '","os":"windows"}'
   $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
 
   $req = [System.Net.HttpWebRequest]::Create('https://buddy-trace.lbase.com/admin/api/install-ping')
