@@ -64,10 +64,6 @@ Buddy Trace 让这一步变轻：**换新会话，什么都不用交代，说一
 
 ![接入指令](docs/screenshots/02-setup-prompt.png)
 
-之后换账号，直接说「继续做那个项目」：
-
-![换号继续的场景](docs/screenshots/03-scenario-continue.png)
-
 ## 特性
 
 - **免费 · 免注册、免登录**：装完即用，不收费
