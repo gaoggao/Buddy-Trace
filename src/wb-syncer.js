@@ -43,6 +43,8 @@ export class WbSyncer {
     this.timer = null;
     this.running = false;
     this.last = null;   // 上次同步结果
+    // 3.0.5：worker 连续失败计数（只记日志用，不影响重试）
+    this.failStreak = 0;
   }
 
   /** 当前端口（支持传函数，实时取） */
@@ -78,32 +80,42 @@ export class WbSyncer {
   }
 
   /**
-   * 在 worker 线程里跑同步扫描（3.0.4）
+   * 在 worker 线程里跑同步扫描（3.0.4 引入，3.0.5 加固）
    *
-   * scan() 扫 8 万个文件要 6 秒，是同步函数，占住主线程 → 那 6 秒服务不响应，
-   * 用户看到「网页打不开，过一会自己好了」。放进 worker 后主线程照常应答。
+   * scan() 扫 WorkBuddy 目录是同步函数，放主线程会卡死服务（实测回退时 10~114 分钟）。
+   * 3.0.5 起：**不再回退主线程** —— worker 失败就跳过这一轮，下一轮 30 分钟后照常重试。
+   * 老板定调：「宁可漏扫一轮，绝不卡死服务」。
    *
-   * 容错：worker 失败 / 超时 → 回退到主线程 scan()，功能不丢。
+   * @returns {Promise<{result:object|null, error:string|null}>}
    */
   #scanInWorker(opts) {
     return new Promise((resolve) => {
       let w;
       try {
         w = new Worker(new URL('./scan-worker.js', import.meta.url), { workerData: opts });
-      } catch { resolve(null); return; }
+      } catch (e) {
+        resolve({ result: null, error: 'worker 启动失败: ' + (e && e.message || e) });
+        return;
+      }
       let done = false;
-      const finish = (v) => {
+      const finish = (result, error) => {
         if (done) return;
         done = true;
         clearTimeout(timer);
+        // 等 worker 真正退出再放行，避免它还在跑时主线程做别的事
         try { w.terminate().catch(() => {}); } catch { /* ignore */ }
-        resolve(v);
+        resolve({ result, error });
       };
-      // 兜底超时 4 分钟（正常 6 秒，冷启动几十秒顶天）
-      const timer = setTimeout(() => finish(null), 4 * 60 * 1000);
-      w.on('message', (m) => finish(m && m.ok ? m.result : null));
-      w.on('error', () => finish(null));
-      w.on('exit', (code) => { if (code !== 0) finish(null); });
+      // 超时 4 分钟（正常 1~2 秒；-loader 卡顿也远超这个值）
+      const timer = setTimeout(() => finish(null, 'worker 超时 4 分钟'), 4 * 60 * 1000);
+      w.on('message', (m) => {
+        if (m && m.ok) finish(m.result, null);
+        else finish(null, 'worker 返回失败: ' + ((m && m.error) || '未知'));
+      });
+      w.on('error', (e) => finish(null, 'worker 出错: ' + (e && e.message || e)));
+      w.on('exit', (code) => {
+        if (code !== 0 && !done) finish(null, 'worker 异常退出 code=' + code);
+      });
     });
   }
 
@@ -132,14 +144,31 @@ export class WbSyncer {
       harvested = harvestAccountNamesToStore(this.dataDir);
     } catch { /* 挖不到就算了，不影响扫描 */ }
 
-      // ② 扫描（3.0.4：放进 worker，主线程不被 6 秒的同步扫描卡住）
+      // ② 扫描（3.0.5：只走 worker，失败就跳过这一轮 —— 绝不回退主线程卡死服务）
       if (o.force) { this.mtimeCache = new Map(); this.sessCache = new Map(); }
       const scanOpts = { dataDir: this.dataDir, mtimeCache: this.mtimeCache, sessCache: this.sessCache };
-      const wres = await this.#scanInWorker(scanOpts);
-      // worker 失败/超时 → 回退主线程，保证功能不丢（旧行为）
-      const viaWorker = !!wres;
-      const res = wres || scan(scanOpts);
-      svcLog(`同步扫描：${Date.now() - t0}ms  来源=${viaWorker ? 'worker' : '主线程(回退)'}  条目=${res.items.length}  扫描文件=${res.stats.scanned}`);
+      const scanOut = await this.#scanInWorker(scanOpts);
+
+      if (!scanOut.result) {
+        // worker 失败：记原因 + 跳过本轮。下一轮 30 分钟后照常重试，不会永久停摆。
+        this.failStreak += 1;
+        const warn = (this.failStreak === 1 || this.failStreak % 3 === 0)
+          ? `  ⚠ 连续第 ${this.failStreak} 次扫描失败（每轮独立重试，不会停摆）` : '';
+        svcLog(`同步跳过：${scanOut.error || '未知原因'}  耗时=${Date.now() - t0}ms${warn}`);
+        this.last = {
+          at: new Date().toISOString(),
+          ok: false,
+          skipped: true,
+          error: scanOut.error,
+          failStreak: this.failStreak,
+          ms: Date.now() - t0,
+        };
+        return { ok: false, skipped: true, error: scanOut.error, failStreak: this.failStreak };
+      }
+
+      this.failStreak = 0;   // 成功一轮就清零
+      const res = scanOut.result;
+      svcLog(`同步扫描：${Date.now() - t0}ms  来源=worker  条目=${res.items.length}  扫描文件=${res.stats.scanned}`);
 
       // ③ 去重写入（内容变了要更新，不能只按 fingerprint 跳过）
       //
